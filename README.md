@@ -73,7 +73,6 @@ uvicorn parakeet_service.main:app \
   --workers 1
 ```
 
-> **Tip:** Use `--workers=1` to avoid multiple model loads. Lifespan events handle GPU allocation and cleanup per process.
 
 ### Docker (example)
 
