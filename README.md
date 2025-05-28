@@ -52,9 +52,10 @@ python -m venv .venv
 source .venv/bin/activate
 
 # install dependencies
-pip install --upgrade pip
-pip install torch torchaudio nemo_toolkit['asr'] fastapi uvicorn python-multipart pydantic omegaconf
-pip install git+https://github.com/snakers4/silero-vad.git  # Silero VAD via TorchHub
+pip install torch==2.7.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128 --no-cache-dir \
+ && pip install nemo_toolkit["asr"] \
+ && pip install 'uvicorn[standard]' --no-cache-dir \
+ && pip install --no-cache-dir -r requirements.txt
 ````
 
 ## Configuration
