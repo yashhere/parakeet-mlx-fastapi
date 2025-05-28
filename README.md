@@ -201,5 +201,4 @@ Please adhere to existing code style and add docstrings for new functionality.
 
 ## License
 
-This project is licensed under the [Apache 2.0 License](LICENSE).
 See [LICENSE](./LICENSE) for details.
