@@ -1,0 +1,40 @@
+name: Publish Built Image
+
+on:
+  workflow_run:
+    workflows: ["Docker Image CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  publish:
+    # only run when the build workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the image built in CI
+        run: |
+          SHA=${{ github.event.workflow_run.head_sha }}
+          IMAGE=ghcr.io/${{ github.repository }}:${SHA}
+          echo "🔍 Pulling $IMAGE"
+          docker pull "$IMAGE"
+
+      - name: Push to GHCR
+        run: |
+          echo "🚀 Pushing $IMAGE"
+          docker push "$IMAGE"
+
+      - name: Done
+        run: echo "✅ Published $IMAGE"
