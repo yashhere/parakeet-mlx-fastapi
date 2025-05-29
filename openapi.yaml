@@ -67,6 +67,12 @@ components:
           title: Include Timestamps
           description: Return char/word/segment offsets
           default: false
+        should_chunk:
+          type: boolean
+          title: Should Chunk
+          description: If true (default), split long audio into ~60s VAD-aligned chunks
+            for batching
+          default: true
       type: object
       required:
       - file

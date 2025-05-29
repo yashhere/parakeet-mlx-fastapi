@@ -2,6 +2,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
+from collections import defaultdict
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, UploadFile, status, Request, Form
 
@@ -11,6 +12,7 @@ from .schemas import TranscriptionResponse
 from .config import logger
 
 from parakeet_service.model import reset_fast_path
+from parakeet_service.chunker import vad_chunk
 
 
 router = APIRouter(tags=["speech"])
@@ -33,6 +35,9 @@ async def transcribe_audio(
     include_timestamps: bool = Form(
         False, description="Return char/word/segment offsets",
     ),
+    should_chunk: bool = Form(True,
+        description="If true (default), split long audio into "
+                    "~30s VAD-aligned chunks for batching"),
 ):
     # 1 – persist upload
     suffix = Path(file.filename or "").suffix or ".wav"
@@ -42,16 +47,24 @@ async def transcribe_audio(
     await file.close()
 
     original, to_model = ensure_mono_16k(original)
-    schedule_cleanup(background_tasks, original, to_model)
+
+    if should_chunk:
+        chunk_paths = vad_chunk(to_model) or [to_model]
+    else:
+        chunk_paths = [to_model]
+
+    logger.info("transcribe(): sending %d chunks to ASR", len(chunk_paths))
+
+    schedule_cleanup(background_tasks, original, to_model, *chunk_paths)
 
     # 2 – run ASR
     model = request.app.state.asr_model
 
     try:
-        out = model.transcribe(
-            [str(to_model)],
-            batch_size=1,                # avoids auto-batch VRAM spikes
-            timestamps=include_timestamps
+        outs = model.transcribe(
+            [str(p) for p in chunk_paths],
+            batch_size=2,
+            timestamps=include_timestamps,
         )
         if (
           not include_timestamps                     # switch back to model fast-path if timestamps turned off
@@ -64,12 +77,22 @@ async def transcribe_audio(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail=str(exc)) from exc
 
-    hyp = out[0] if isinstance(out, list) else out[0][0]
-    text = getattr(hyp, "text", str(hyp))
-    ts_raw = getattr(hyp, "timestamp", None) if include_timestamps else None
+    if isinstance(outs, tuple):
+      outs = outs[0]
+    texts = []
+    ts_agg = [] if include_timestamps else None
+    merged = defaultdict(list)
 
-    return TranscriptionResponse(text=text,
-                                 timestamps=_to_builtin(ts_raw) if ts_raw else None)
+    for h in outs:
+        texts.append(getattr(h, "text", str(h)))
+        if include_timestamps:
+            for k, v in _to_builtin(getattr(h, "timestamp", {})).items():
+                merged[k].extend(v)           # concat lists
+
+    merged_text = " ".join(texts).strip()
+    timestamps  = dict(merged) if include_timestamps else None
+
+    return TranscriptionResponse(text=merged_text, timestamps=timestamps)
 
 @router.get("/debug/cfg")
 def show_cfg(request: Request):
