@@ -12,7 +12,7 @@ from .schemas import TranscriptionResponse
 from .config import logger
 
 from parakeet_service.model import reset_fast_path
-from parakeet_service.chunker import vad_chunk
+from parakeet_service.chunker import vad_chunk, vad_chunk_streaming
 
 
 router = APIRouter(tags=["speech"])
@@ -37,7 +37,7 @@ async def transcribe_audio(
     ),
     should_chunk: bool = Form(True,
         description="If true (default), split long audio into "
-                    "~30s VAD-aligned chunks for batching"),
+                    "~60s VAD-aligned chunks for batching"),
 ):
     # 1 – persist upload
     suffix = Path(file.filename or "").suffix or ".wav"
@@ -49,7 +49,7 @@ async def transcribe_audio(
     original, to_model = ensure_mono_16k(original)
 
     if should_chunk:
-        chunk_paths = vad_chunk(to_model) or [to_model]
+        chunk_paths = vad_chunk_streaming(to_model) or [to_model]
     else:
         chunk_paths = [to_model]
 

@@ -10,8 +10,8 @@ vad_model, vad_utils = torch_hub_load("snakers4/silero-vad", "silero_vad")
 SAMPLE_RATE              = 16_000         # model is trained for 16 kHz
 WINDOW_SAMPLES           = 512            # 32 ms frame
 THRESHOLD                = 0.60           # voice prob ≥ 0.60 → speech
-MIN_SILENCE_MS           = 250            # flush after ≥350 ms quiet
-SPEECH_PAD_MS            = 2              # keep 2 ms context before/after
+MIN_SILENCE_MS           = 250            # flush after ≥250 ms quiet
+SPEECH_PAD_MS            = 120            # keep 120 ms context before/after
 MAX_SPEECH_MS            = 8_000          # hard stop at 8 s
 
 # Helper: float32 → int16 PCM bytes

@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import contextlib
+import gc
 import torch, asyncio
 import nemo.collections.asr as nemo_asr
 from omegaconf import open_dict
@@ -28,9 +29,14 @@ async def lifespan(app):
     """Load model once per process; free GPU on shutdown."""
     logger.info("Loading %s …", MODEL_NAME)
     with torch.inference_mode():
-        model = nemo_asr.models.ASRModel.from_pretrained(MODEL_NAME)
-        model = model.to(dtype=torch.float16)        # weights = 1.2 GB #TODO: make optional via envars
+        model_fp32 = nemo_asr.models.ASRModel.from_pretrained(MODEL_NAME, map_location="cpu")
+        model_fp16 = model_fp32.to(dtype=torch.float16) # weights = 1.2 GB #TODO: make optional via envars
+        del model_fp32
+        model = model_fp16.cuda()
         
+    gc.collect()  # should reclaim the unreferenced fp32 RAM
+    torch.cuda.empty_cache() 
+
     app.state.asr_model = model
     logger.info("Model ready on %s", next(model.parameters()).device)
 
