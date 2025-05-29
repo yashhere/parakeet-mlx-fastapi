@@ -27,7 +27,7 @@ jobs:
       - name: Pull the image built in CI
         run: |
           SHA=${{ github.event.workflow_run.head_sha }}
-          IMAGE=ghcr.io/${{ github.repository }}:${SHA}
+          IMAGE=ghcr.io/shadowfita/parakeet-tdt-0.6b-v2-fastapi:${SHA}
           echo "🔍 Pulling $IMAGE"
           docker pull "$IMAGE"
 
