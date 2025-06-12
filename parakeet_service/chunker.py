@@ -1,12 +1,16 @@
 """
 Offline VAD-aware splitters
 ───────────────────────────
-* vad_chunk            – legacy helper (loads full file, unchanged)
+* vad_chunk_lowmem     – Low-memory chunker for non-streaming processing
   - target 60-s chunks (±10 s)
   - never cut mid-utterance (trailing silence ≥ 300 ms)
+  - processes audio incrementally to minimize memory usage
   - returns List[pathlib.Path] of temp .wav files
 
-* vad_chunk_streaming  – New low-RAM streamer
+* vad_chunk_streaming  – Low-RAM streamer for streaming use cases
+  - processes audio in small stripes (2 seconds at a time)
+  - uses VADIterator to split on speech boundaries
+  - returns List[pathlib.Path] of temp .wav files
 """
 
 from __future__ import annotations
@@ -26,49 +30,79 @@ MAX_SEC            = 70          # never exceed this in one chunk
 TRAIL_SIL_MS       = 300         # keep ≥300 ms silence at cut point
 THRESH             = 0.60        # stricter prob threshold
 
-def vad_chunk(path: pathlib.Path) -> List[pathlib.Path]:
-    import torchaudio
-
-    wav, sr = torchaudio.load(str(path))
-    if sr != SAMPLE_RATE:
-        wav = torchaudio.functional.resample(wav, sr, SAMPLE_RATE)
-    wav = wav.mean(0).numpy()
-
-    speech_ts = get_speech_ts(
-        wav, vad_model, sampling_rate=SAMPLE_RATE,
-        threshold=THRESH, min_silence_duration_ms=TRAIL_SIL_MS,
+def vad_chunk_lowmem(path: pathlib.Path) -> List[pathlib.Path]:
+    """Low-memory VAD chunking for non-streaming processing"""
+    import librosa
+    
+    # Get audio file info
+    with sf.SoundFile(path) as snd:
+        file_sr = snd.samplerate
+        duration = len(snd) / file_sr
+        
+    # Initialize VAD iterator
+    vad_iter = VADIterator(
+        vad_model,
+        sampling_rate=SAMPLE_RATE,
+        threshold=THRESH,
+        min_silence_duration_ms=TRAIL_SIL_MS,
+        speech_pad_ms=SPEECH_PAD_MS,
     )
-    if not speech_ts:
-        return []
+    
+    # Buffer for current chunk
+    current_chunk = bytearray()
+    chunks = []
+    speech_ms = 0
+    
+    # Process audio in chunks
+    for chunk_start in range(0, int(duration * SAMPLE_RATE), STRIPE_FRAMES):
+        # Load audio segment with librosa for format conversion
+        y, _ = librosa.load(
+            path, 
+            sr=SAMPLE_RATE, 
+            offset=chunk_start/SAMPLE_RATE,
+            duration=STRIPE_SEC,
+            mono=True
+        )
+        
+        # Convert to int16
+        audio_int16 = (y * 32767).astype(np.int16)
+        
+        # Process in 512-sample windows
+        for i in range(0, len(audio_int16), 512):
+            window = audio_int16[i:i+512]
+            if len(window) < 512:
+                break
+                
+            # Convert to float for VAD
+            window_f32 = window.astype(np.float32) / 32768
+            evt = vad_iter(window_f32)
+            
+            # Add to current chunk
+            current_chunk.extend(window.tobytes())
+            speech_ms += 32
+            
+            # Check if we should finalize chunk
+            if (evt and evt.get("end")) or speech_ms >= MAX_CHUNK_MS:
+                if current_chunk:
+                    chunks.append(_flush(current_chunk))
+                    current_chunk.clear()
+                    speech_ms = 0
+    
+    # Finalize last chunk
+    if current_chunk:
+        chunks.append(_flush(current_chunk))
+    
+    return chunks
 
-    groups, current, cur_len = [], [], 0
-    for seg in speech_ts:
-        seg_len = seg["end"] - seg["start"]
-        if cur_len + seg_len > TARGET_SEC * SAMPLE_RATE and cur_len > 0:
-            groups.append(current); current, cur_len = [], 0
-        current.append(seg); cur_len += seg_len
-        if cur_len > MAX_SEC * SAMPLE_RATE:
-            groups.append(current); current, cur_len = [], 0
-    if current:
-        groups.append(current)
-
-    paths = []
-    for g in groups:
-        start, end = g[0]["start"], g[-1]["end"]
-        clip = wav[start:end]
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        with wave.open(tmp, "wb") as wf:
-            wf.setnchannels(1); wf.setsampwidth(2); wf.setframerate(SAMPLE_RATE)
-            wf.writeframes(
-                np.clip(clip * 32768, -32768, 32767).astype(np.int16).tobytes()
-            )
-        paths.append(pathlib.Path(tmp.name))
-    return paths
-
+# Constants for both chunkers
 STRIPE_SEC        = 2                         # read 2-second stripes
 STRIPE_FRAMES     = SAMPLE_RATE * STRIPE_SEC
 MAX_CHUNK_MS      = 60_000                    # hard 60s cap
 SPEECH_PAD_MS     = 120                       # same as live VAD
+TARGET_SEC        = 60
+MAX_SEC           = 70
+TRAIL_SIL_MS      = 300
+THRESH            = 0.60
 
 def _flush(buf: bytearray) -> pathlib.Path:
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
