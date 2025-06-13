@@ -27,15 +27,19 @@ def _to_builtin(obj):
 @asynccontextmanager
 async def lifespan(app):
     """Load model once per process; free GPU on shutdown."""
-    logger.info("Loading %s …", MODEL_NAME)
+    logger.info("Loading %s with optimized memory...", MODEL_NAME)
     with torch.inference_mode():
-        model_fp32 = nemo_asr.models.ASRModel.from_pretrained(MODEL_NAME, map_location="cpu")
-        model_fp16 = model_fp32.to(dtype=torch.float16) # weights = 1.2 GB #TODO: make optional via envars
-        del model_fp32
-        model = model_fp16.cuda()
+        # Load model directly to GPU with FP16 weights
+        model = nemo_asr.models.ASRModel.from_pretrained(
+            MODEL_NAME, 
+            map_location="cuda"
+        ).to(dtype=torch.float16)
+        logger.info("Loaded model with FP16 weights")
         
-    gc.collect()  # should reclaim the unreferenced fp32 RAM
-    torch.cuda.empty_cache() 
+    # Aggressive cleanup
+    gc.collect()
+    torch.cuda.empty_cache()
+    logger.info("Memory cleanup complete")
 
     app.state.asr_model = model
     logger.info("Model ready on %s", next(model.parameters()).device)
