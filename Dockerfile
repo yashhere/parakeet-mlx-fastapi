@@ -4,7 +4,7 @@ FROM python:3.10.7-slim AS builder
 # Install system dependencies including ffmpeg
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        git build-essential libsndfile1 ffmpeg \
+        git build-essential ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -28,7 +28,7 @@ FROM python:3.10.7-slim
 # Install runtime dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        libsndfile1 ffmpeg \
+        ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
