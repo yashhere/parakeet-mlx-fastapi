@@ -4,4 +4,3 @@ omegaconf==2.3.0
 python-multipart==0.0.9
 soundfile==0.12.1
 pydantic==2.7.4
-aiofiles==24.0.0
