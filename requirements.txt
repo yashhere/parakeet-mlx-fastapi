@@ -1,6 +1,11 @@
-fastapi==0.115.12
-numpy==1.26.4
-omegaconf==2.3.0
-python-multipart==0.0.9
-soundfile==0.12.1
-pydantic==2.7.4
+fastapi
+uvicorn
+numpy
+torch
+torchaudio
+pydantic
+omegaconf
+pytest
+python-multipart
+ffmpeg-python
+python-dotenv

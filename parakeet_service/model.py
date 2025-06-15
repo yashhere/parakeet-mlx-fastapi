@@ -5,7 +5,7 @@ import torch, asyncio
 import nemo.collections.asr as nemo_asr
 from omegaconf import open_dict
 
-from .config import MODEL_NAME, logger
+from .config import MODEL_NAME, MODEL_PRECISION, DEVICE, logger
 
 from parakeet_service.batchworker import batch_worker
 
@@ -29,12 +29,15 @@ async def lifespan(app):
     """Load model once per process; free GPU on shutdown."""
     logger.info("Loading %s with optimized memory...", MODEL_NAME)
     with torch.inference_mode():
-        # Load model directly to GPU with FP16 weights
+        # Determine precision
+        dtype = torch.float16 if MODEL_PRECISION == "fp16" else torch.float32
+        
+        # Load model with configurable device and precision
         model = nemo_asr.models.ASRModel.from_pretrained(
             MODEL_NAME, 
-            map_location="cuda"
-        ).to(dtype=torch.float16)
-        logger.info("Loaded model with FP16 weights")
+            map_location=DEVICE
+        ).to(dtype=dtype)
+        logger.info("Loaded model with %s weights on %s", MODEL_PRECISION.upper(), DEVICE)
         
     # Aggressive cleanup
     gc.collect()
