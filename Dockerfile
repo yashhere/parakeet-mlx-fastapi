@@ -33,7 +33,7 @@ RUN apt-get update && \
 
 WORKDIR /app
 COPY ./parakeet_service ./parakeet_service
-COPY .env .
+COPY .env.example .env
 COPY --from=builder /opt/venv /opt/venv
 
 ENV PATH="/opt/venv/bin:${PATH}" \
