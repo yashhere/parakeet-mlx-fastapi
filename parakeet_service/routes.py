@@ -25,7 +25,7 @@ def health():
 
 
 @router.post(
-    "/transcribe",
+    ["/transcribe", "/audio/transcriptions"],
     response_model=TranscriptionResponse,
     summary="Transcribe an audio file",
 )
