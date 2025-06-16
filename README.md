@@ -213,9 +213,4 @@ H --> A
 ## Contributing
 
 1. Fork the repository and create your feature branch
-2. Run tests: `pytest tests/`
-3. Submit a pull request with detailed description
-
-## License
-
-Apache 2.0 - See [LICENSE](LICENSE) for details.
+2. Submit a pull request with detailed description
