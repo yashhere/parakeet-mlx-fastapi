@@ -1,6 +1,5 @@
 from __future__ import annotations
 import asyncio
-import shutil
 import tempfile
 from pathlib import Path
 from collections import defaultdict
@@ -10,19 +9,16 @@ from fastapi import (
     BackgroundTasks,
     File,
     HTTPException,
-    Query,
     UploadFile,
     status,
     Request,
     Form,
 )
 
-from .audio import ensure_mono_16k, schedule_cleanup
-from .model import _to_builtin
-from .schemas import TranscriptionResponse
-from .config import logger
-
-from parakeet_service.model import reset_fast_path
+from parakeet_service import config
+from parakeet_service.audio import ensure_mono_16k, schedule_cleanup
+from parakeet_service.schemas import TranscriptionResponse
+from parakeet_service.config import logger
 
 
 router = APIRouter(tags=["speech"])
@@ -60,11 +56,12 @@ async def transcribe_audio(
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp_path = Path(tmp.name)
 
+    mp3_tmp_path = None
+
     # Stream upload directly to processing with cancellation handling
     try:
         # Use FFmpeg for MP3 files to fix header issues
         # Create temp MP3 file if needed
-        mp3_tmp_path = None
         if suffix.lower() == ".mp3":
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as mp3_tmp:
                 mp3_tmp_path = Path(mp3_tmp.name)
@@ -123,13 +120,14 @@ async def transcribe_audio(
 
             # Read stderr in real-time
             stderr_lines = []
-            while True:
-                line = await process.stderr.readline()
-                if not line:
-                    break
-                line_str = line.decode().strip()
-                stderr_lines.append(line_str)
-                logger.debug(f"FFmpeg: {line_str}")
+            if process.stderr:  # Check if stderr is not None
+                while True:
+                    line = await process.stderr.readline()
+                    if not line:
+                        break
+                    line_str = line.decode().strip()
+                    stderr_lines.append(line_str)
+                    logger.debug(f"FFmpeg: {line_str}")
 
             # Wait for process to finish
             return_code = await process.wait()
@@ -143,9 +141,9 @@ async def transcribe_audio(
                     detail=f"Invalid audio format: {stderr_str[:200]}",
                 )
             else:
-                logger.debug(f"FFmpeg completed successfully")
+                logger.debug("FFmpeg completed successfully")
     except asyncio.CancelledError:
-        # Clean up temporary files if processing was cancelled
+        # Clean up temporary files if processing was canceled
         if tmp_path.exists():
             tmp_path.unlink()
         if mp3_tmp_path and mp3_tmp_path.exists():
@@ -223,13 +221,12 @@ async def transcribe_audio(
 
 
 @router.get("/debug/cfg")
-def show_cfg(request: Request):
-    """Show model configuration - simplified for parakeet-mlx"""
-    model = request.app.state.asr_model
+def show_cfg(_request: Request):
+    """Show model configuration"""
     config_info = {
-        "model_name": "mlx-community/parakeet-tdt-0.6b-v2",
-        "precision": "bf16",
-        "sample_rate": 16000,
+        "model_name": config.MODEL_NAME,
+        "sample_rate": config.TARGET_SR,
+        "precision": config.MODEL_PRECISION,
         "framework": "MLX",
     }
     return config_info

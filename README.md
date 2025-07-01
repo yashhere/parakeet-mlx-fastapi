@@ -1,22 +1,28 @@
-# Parakeet-TDT 0.6B v2 FastAPI STT Service
+# Parakeet-TDT MLX FastAPI STT Service
 
-A production-ready FastAPI service for high-accuracy English speech-to-text using NVIDIA's Parakeet-TDT 0.6B v2 model. Implements both REST and WebSocket endpoints following the [OpenAI Audio API specification](https://platform.openai.com/docs/api-reference/audio) interface.
+A production-ready FastAPI service for high-accuracy English speech-to-text using NVIDIA's Parakeet-TDT models optimized for Apple Silicon via MLX. Implements both REST and WebSocket endpoints following the [OpenAI Audio API specification](https://platform.openai.com/docs/api-reference/audio) interface.
 
 ## Features
 
+- **Apple Silicon Optimized**
+  - Native MLX implementation for M1/M2/M3 Macs
+  - Memory-efficient bf16 precision by default
+  - Optimized for local inference without CUDA dependency
+
 - **RESTful transcription**  
   - `POST /transcribe` with multipart audio uploads
-  - Word/character/segment timestamps
+  - Word/character/segment timestamps via parakeet-mlx
   - OpenAI-compatible response schema
 
 - **WebSocket streaming**  
-  - Real-time voice activity detection via Silero VAD
-  - Partial/final transcription delivery
+  - Real-time streaming transcription with MLX
+  - Context-aware streaming with configurable attention windows
   - Supports 16kHz mono PCM input
 
-- **Batch processing**  
-  - Micro-batching for efficient GPU utilization
-  - Configurable batch size and processing timeout
+- **Intelligent chunking**  
+  - Built-in audio chunking with overlap for long files
+  - Memory-efficient processing via parakeet-mlx
+  - Configurable chunk duration and overlap
 
 - **Production-ready deployment**  
   - Docker and Docker Compose support
@@ -25,7 +31,7 @@ A production-ready FastAPI service for high-accuracy English speech-to-text usin
 
 - **Audio preprocessing**  
   - Automatic downmixing and resampling
-  - File validation and chunking
+  - File validation and format conversion
 
 ## Table of Contents
 
@@ -44,28 +50,34 @@ A production-ready FastAPI service for high-accuracy English speech-to-text usin
 ## Prerequisites
 
 - Python 3.10+  
-- NVIDIA GPU with CUDA 12.1+ (recommended)
+- Apple Silicon Mac (M1/M2/M3) or Intel Mac for optimal performance
+- FFmpeg (for audio format conversion)
 - Docker Engine 24.0+ (for container deployment)
+
+**Note**: While parakeet-mlx is optimized for Apple Silicon, it can run on other platforms but may not provide the same performance benefits as the native MLX implementation.
 
 ## Installation
 
 ### Local Development
 ```bash
-git clone https://github.com/your-repo/parakeet-fastapi.git
-cd parakeet-fastapi
+git clone https://github.com/your-repo/parakeet-mlx-fastapi.git
+cd parakeet-mlx-fastapi
 
 # Create and activate virtual environment
 python -m venv .venv
 source .venv/bin/activate
 
-# Install dependencies
+# Install dependencies (includes parakeet-mlx)
 pip install -r requirements.txt
+
+# Install FFmpeg if not already installed (macOS)
+brew install ffmpeg
 ```
 
 ### Docker Deployment
 ```bash
-docker build -t parakeet-stt .
-docker run -d -p 8000:8000 --gpus all parakeet-stt
+docker build -t parakeet-mlx-stt .
+docker run -d -p 8000:8000 parakeet-mlx-stt
 ```
 
 ### Docker Compose
@@ -79,18 +91,16 @@ All configuration is managed through environment variables. Create a `.env` file
 
 ```ini
 # Model configuration
-MODEL_PRECISION=fp16
-DEVICE=cuda
+MODEL_PRECISION=bf16
 BATCH_SIZE=4
 
 # Audio processing
 TARGET_SR=16000
 MAX_AUDIO_DURATION=30
-VAD_THRESHOLD=0.5
 
 # System
 LOG_LEVEL=INFO
-PROCESSING_TIMEOUT=60
+PROCESSING_TIMEOUT=120
 ```
 
 ## Running the Server
@@ -152,6 +162,7 @@ Connect to `ws://localhost:8000/ws` to stream audio:
 
 - **Input**: 16kHz mono PCM frames (int16)
 - **Output**: JSON messages with partial/final transcriptions
+- **Features**: Context-aware streaming with configurable attention windows
 
 **JavaScript Example**:
 ```javascript
@@ -177,38 +188,45 @@ ws.onmessage = evt => {
 graph LR
 A[Client] -->|HTTP| B[REST API]
 A -->|WebSocket| C[Streaming API]
-B --> D[Batch Worker]
-C --> E[VAD Processing]
-E --> F[Chunker]
-F --> D
-D --> G[ASR Model]
-G --> H[Response Formatter]
-H --> A
+B --> D[parakeet-mlx Model]
+C --> E[MLX Streaming Context]
+E --> D
+D --> F[Response Formatter]
+F --> A
 ```
 
 **Components**:
 1. **`main.py`** - App initialization and lifecycle management
 2. **`routes.py`** - REST endpoints implementation
-3. **`stream_routes.py`** - WebSocket endpoint handler
-4. **`streaming_vad.py`** - Voice activity detection
-5. **`chunker.py`** - Audio segmentation
-6. **`batchworker.py`** - Micro-batch processing
-7. **`model.py`** - ASR model interface
-8. **`audio.py`** - Audio preprocessing utilities
-9. **`config.py`** - Configuration management
+3. **`stream_routes.py`** - WebSocket endpoint with MLX streaming
+4. **`model.py`** - parakeet-mlx model interface
+5. **`audio.py`** - Audio preprocessing utilities
+6. **`config.py`** - Configuration management
+
+**MLX-Specific Features**:
+- **Streaming Context**: Context-aware streaming with configurable attention windows
+- **Memory Efficiency**: bf16 precision by default for optimal memory usage
+- **Built-in Chunking**: Intelligent audio chunking with overlap handling
+- **Apple Silicon Optimization**: Native MLX implementation for M-series chips
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MODEL_PRECISION` | fp16 | Model precision (fp16/fp32) |
-| `DEVICE` | cuda | Computation device |
+| `MODEL_PRECISION` | bf16 | Model precision (bf16/fp32) |
 | `BATCH_SIZE` | 4 | Processing batch size |
 | `TARGET_SR` | 16000 | Target sample rate |
 | `MAX_AUDIO_DURATION` | 30 | Max audio length in seconds |
-| `VAD_THRESHOLD` | 0.5 | Voice activity threshold |
 | `LOG_LEVEL` | INFO | Logging verbosity |
-| `PROCESSING_TIMEOUT` | 60 | Processing timeout in seconds |
+| `PROCESSING_TIMEOUT` | 120 | Processing timeout in seconds |
+
+## MLX Benefits
+
+- **Apple Silicon Native**: Optimized for M1/M2/M3 processors
+- **Memory Efficient**: bf16 precision reduces memory usage by ~50%
+- **Local Inference**: No need for cloud APIs or CUDA dependencies
+- **Streaming Support**: Real-time transcription with context awareness
+- **Easy Installation**: Simple pip install without complex dependencies
 
 ## Contributing
 

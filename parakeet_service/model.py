@@ -1,10 +1,8 @@
 from contextlib import asynccontextmanager
-import contextlib
 import gc
-import asyncio
-from parakeet_mlx import from_pretrained
+from parakeet_mlx import from_pretrained  # type: ignore
 
-from .config import MODEL_NAME, MODEL_PRECISION, logger
+from parakeet_service.config import MODEL_NAME, MODEL_PRECISION, logger
 
 
 def _to_builtin(obj):
@@ -44,9 +42,3 @@ async def lifespan(app):
         logger.info("Shutting down and releasing resources")
         del app.state.asr_model
         gc.collect()
-
-
-def reset_fast_path(model):
-    """Placeholder for compatibility - MLX handles optimization internally."""
-    # parakeet-mlx doesn't need explicit fast path reset
-    pass

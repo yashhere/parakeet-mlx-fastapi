@@ -1,7 +1,4 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-import asyncio
-import tempfile
-import wave
 import numpy as np
 from parakeet_service.config import logger
 
@@ -67,5 +64,5 @@ async def ws_asr(ws: WebSocket):
         logger.error(f"WebSocket streaming error: {e}")
         try:
             await ws.send_json({"error": f"Streaming failed: {str(e)}"})
-        except:
+        except:  # noqa
             pass  # Connection might already be closed

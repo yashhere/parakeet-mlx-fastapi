@@ -6,15 +6,15 @@ Audio helpers:
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Iterable, Tuple, List
+from typing import Tuple, List
 import tempfile
 
-import soundfile as sf
+import soundfile as sf  # type: ignore
 import librosa
 import numpy as np
 from fastapi import BackgroundTasks, HTTPException, status
 
-from .config import TARGET_SR, logger
+from parakeet_service.config import TARGET_SR, logger
 
 
 SUPPORTED_EXTS: List[str] = [".wav", ".flac", ".mp3", ".ogg", ".opus"]
@@ -102,7 +102,7 @@ def ensure_mono_16k(src: Path) -> Tuple[Path, Path]:
             with sf.SoundFile(src) as snd:
                 if snd.samplerate == 16000 and snd.channels == 1:
                     return src, src
-        except:
+        except:  # noqa
             pass
 
     # Use streaming conversion for other cases

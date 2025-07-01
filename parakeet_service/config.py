@@ -1,21 +1,19 @@
-import logging, os, sys
-from pathlib import Path
+import logging
+import os
+import sys
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-MODEL_NAME = "mlx-community/parakeet-tdt-0.6b-v2"  # Updated to MLX model
+MODEL_NAME = "mlx-community/parakeet-tdt_ctc-1.1b"
 
 # Configuration from environment variables
-TARGET_SR = int(os.getenv("TARGET_SR", "16000"))  # model's native sample-rate
-MODEL_PRECISION = os.getenv(
-    "MODEL_PRECISION", "bf16"
-)  # Changed default to bf16 for MLX
+TARGET_SR = int(os.getenv("TARGET_SR", "16000"))
+MODEL_PRECISION = os.getenv("MODEL_PRECISION", "bf16")
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "4"))
-MAX_AUDIO_DURATION = int(os.getenv("MAX_AUDIO_DURATION", "30"))  # seconds
-VAD_THRESHOLD = float(os.getenv("VAD_THRESHOLD", "0.5"))
-PROCESSING_TIMEOUT = int(os.getenv("PROCESSING_TIMEOUT", "60"))  # seconds
+MAX_AUDIO_DURATION = int(os.getenv("MAX_AUDIO_DURATION", "45"))  # seconds
+PROCESSING_TIMEOUT = int(os.getenv("PROCESSING_TIMEOUT", "120"))  # seconds
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(

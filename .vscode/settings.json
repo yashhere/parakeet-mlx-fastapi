@@ -1,0 +1,5 @@
+{
+    "pylint.args": [
+        "--logging-fstring-interpolation"
+    ]
+}
