@@ -5,7 +5,17 @@ import tempfile
 from pathlib import Path
 from collections import defaultdict
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Query, UploadFile, status, Request, Form
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+    Request,
+    Form,
+)
 
 from .audio import ensure_mono_16k, schedule_cleanup
 from .model import _to_builtin
@@ -13,7 +23,6 @@ from .schemas import TranscriptionResponse
 from .config import logger
 
 from parakeet_service.model import reset_fast_path
-from parakeet_service.chunker import vad_chunk_lowmem, vad_chunk_streaming
 
 
 router = APIRouter(tags=["speech"])
@@ -39,17 +48,18 @@ async def transcribe_audio(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(..., media_type="audio/*"),
     include_timestamps: bool = Form(
-        False, description="Return char/word/segment offsets",
+        False,
+        description="Return char/word/segment offsets",
     ),
-    should_chunk: bool = Form(True,
-        description="If true (default), split long audio into "
-                    "~60s VAD-aligned chunks for batching"),
+    should_chunk: bool = Form(
+        True, description="If true (default), enable chunking for long audio files"
+    ),
 ):
     # Create temp file with appropriate extension
     suffix = Path(file.filename or "").suffix or ".wav"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp_path = Path(tmp.name)
-    
+
     # Stream upload directly to processing with cancellation handling
     try:
         # Use FFmpeg for MP3 files to fix header issues
@@ -69,13 +79,25 @@ async def transcribe_audio(
                     if not chunk:
                         break
                     f.write(chunk)
-            
+
             # Update FFmpeg command to read from file
             ffmpeg_cmd = [
-                "ffmpeg", "-v", "error", "-nostdin", "-y",
-                "-i", str(mp3_tmp_path),
-                "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000",
-                "-f", "wav", str(tmp_path)
+                "ffmpeg",
+                "-v",
+                "error",
+                "-nostdin",
+                "-y",
+                "-i",
+                str(mp3_tmp_path),
+                "-acodec",
+                "pcm_s16le",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                "-f",
+                "wav",
+                str(tmp_path),
             ]
         else:
             ffmpeg_cmd = None
@@ -90,15 +112,15 @@ async def transcribe_audio(
                     if not chunk:
                         break
                     f.write(chunk)
-        
+
         # Run FFmpeg if processing MP3
         if ffmpeg_cmd:
             process = await asyncio.create_subprocess_exec(
                 *ffmpeg_cmd,
                 stdout=asyncio.subprocess.DEVNULL,  # We don't need stdout
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
-            
+
             # Read stderr in real-time
             stderr_lines = []
             while True:
@@ -108,17 +130,17 @@ async def transcribe_audio(
                 line_str = line.decode().strip()
                 stderr_lines.append(line_str)
                 logger.debug(f"FFmpeg: {line_str}")
-            
+
             # Wait for process to finish
             return_code = await process.wait()
             stderr_str = "\n".join(stderr_lines)
-            
+
             if return_code != 0:
                 logger.error(f"FFmpeg failed with return code {return_code}")
                 logger.error(f"FFmpeg error output: {stderr_str}")
                 raise HTTPException(
                     status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                    detail=f"Invalid audio format: {stderr_str[:200]}"
+                    detail=f"Invalid audio format: {stderr_str[:200]}",
                 )
             else:
                 logger.debug(f"FFmpeg completed successfully")
@@ -137,7 +159,7 @@ async def transcribe_audio(
             mp3_tmp_path.unlink()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Audio processing failed due to FFmpeg crash"
+            detail="Audio processing failed due to FFmpeg crash",
         )
     finally:
         await file.close()
@@ -145,59 +167,69 @@ async def transcribe_audio(
     # Process audio to ensure mono 16kHz
     original, to_model = ensure_mono_16k(tmp_path)
 
-    if should_chunk:
-        # Use low-memory chunker for non-streaming requests
-      chunk_paths = vad_chunk_lowmem(to_model) or [to_model]
-    else:
-        chunk_paths = [to_model]
+    logger.info("transcribe(): processing audio file")
 
-    logger.info("transcribe(): sending %d chunks to ASR", len(chunk_paths))
-
-    # Clean up all temporary files
-    cleanup_files = [original, to_model] + chunk_paths
+    # Clean up temporary files
+    cleanup_files = [original, to_model]
     if mp3_tmp_path:
         cleanup_files.append(mp3_tmp_path)
     schedule_cleanup(background_tasks, *cleanup_files)
 
-    # 2 – run ASR
+    # Run ASR with parakeet-mlx (chunking handled internally)
     model = request.app.state.asr_model
 
     try:
-        outs = model.transcribe(
-            [str(p) for p in chunk_paths],
-            batch_size=2,
-            timestamps=include_timestamps,
-        )
-        if (
-          not include_timestamps                     # switch back to model fast-path if timestamps turned off
-          and getattr(model.cfg.decoding, "compute_timestamps", False)
-        ):
-          reset_fast_path(model)                    
-    except RuntimeError as exc:
+        # Use parakeet-mlx's built-in chunking if enabled
+        if should_chunk:
+            # Enable chunking with 60-second chunks and 15-second overlap
+            result = model.transcribe(
+                str(to_model), chunk_duration=60.0, overlap_duration=15.0
+            )
+        else:
+            # Process without chunking
+            result = model.transcribe(str(to_model))
+
+        merged_text = result.text
+        timestamps = None
+
+        if include_timestamps and hasattr(result, "sentences"):
+            # Convert parakeet-mlx AlignedSentence objects to compatible format
+            merged = defaultdict(list)
+            for sentence in result.sentences:
+                # Create word-level timestamps from tokens if available
+                if hasattr(sentence, "tokens"):
+                    for token in sentence.tokens:
+                        merged["words"].append(
+                            {"text": token.text, "start": token.start, "end": token.end}
+                        )
+
+                # Add segment-level timestamps
+                merged["segments"].append(
+                    {
+                        "text": sentence.text,
+                        "start": sentence.start,
+                        "end": sentence.end,
+                    }
+                )
+            timestamps = dict(merged)
+
+    except Exception as exc:
         logger.exception("ASR failed")
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail=str(exc)) from exc
-
-    if isinstance(outs, tuple):
-      outs = outs[0]
-    texts = []
-    ts_agg = [] if include_timestamps else None
-    merged = defaultdict(list)
-
-    for h in outs:
-        texts.append(getattr(h, "text", str(h)))
-        if include_timestamps:
-            for k, v in _to_builtin(getattr(h, "timestamp", {})).items():
-                merged[k].extend(v)           # concat lists
-
-    merged_text = " ".join(texts).strip()
-    timestamps  = dict(merged) if include_timestamps else None
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
     return TranscriptionResponse(text=merged_text, timestamps=timestamps)
 
+
 @router.get("/debug/cfg")
 def show_cfg(request: Request):
-    from omegaconf import OmegaConf
-    model = request.app.state.asr_model         
-    yaml_str = OmegaConf.to_yaml(model.cfg, resolve=True) 
-    return yaml_str
+    """Show model configuration - simplified for parakeet-mlx"""
+    model = request.app.state.asr_model
+    config_info = {
+        "model_name": "mlx-community/parakeet-tdt-0.6b-v2",
+        "precision": "bf16",
+        "sample_rate": 16000,
+        "framework": "MLX",
+    }
+    return config_info

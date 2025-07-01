@@ -14,11 +14,8 @@ COPY ./requirements.txt .
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
-# Install Python dependencies
+# Install Python dependencies for Apple Silicon MLX
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install torch==2.7.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128 --no-cache-dir \
- && pip install nemo_toolkit["asr"] \
- && pip install 'uvicorn[standard]' --no-cache-dir \
  && pip install --no-cache-dir -r requirements.txt \
  && pip cache purge
 
