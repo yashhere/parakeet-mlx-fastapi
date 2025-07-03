@@ -9,3 +9,4 @@ python-dotenv
 parakeet-mlx
 librosa
 soundfile
+silero_vad

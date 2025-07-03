@@ -1,5 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import numpy as np
+import mlx.core as mx
 from parakeet_service.config import logger
 
 router = APIRouter()
@@ -33,7 +34,9 @@ async def ws_asr(ws: WebSocket):
 
                     # Convert bytes to float32 audio data
                     pcm_data = (
-                        np.frombuffer(frame_bytes, dtype=np.int16).astype(np.float32)
+                        mx.array(
+                            np.frombuffer(frame_bytes, dtype=np.int16).flatten()
+                        ).astype(mx.float32)
                         / 32768.0
                     )
 

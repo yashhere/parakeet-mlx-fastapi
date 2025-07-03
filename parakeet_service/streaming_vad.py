@@ -1,18 +1,12 @@
 from __future__ import annotations
-import io, wave, tempfile, numpy as np
+import wave
+import tempfile
+import numpy as np
 from typing import List
+from silero_vad import load_silero_vad, VADIterator  # type: ignore
 
-# Note: This component still uses torch for Silero VAD as it's the most reliable VAD available
-# For a pure MLX solution, this would need to be replaced with a different VAD implementation
-try:
-    from torch.hub import load as torch_hub_load
-
-    vad_model, vad_utils = torch_hub_load("snakers4/silero-vad", "silero_vad")
-    (_, _, _, VADIterator, _) = vad_utils
-    VAD_AVAILABLE = True
-except ImportError:
-    VAD_AVAILABLE = False
-    print("Warning: torch not available, VAD functionality disabled")
+# Load the model using the silero-vad package
+vad_model = load_silero_vad()
 
 # TODO: Update to read from .env
 SAMPLE_RATE = 16_000  # model is trained for 16 kHz
@@ -35,9 +29,6 @@ class StreamingVAD:
     """
 
     def __init__(self):
-        if not VAD_AVAILABLE:
-            raise RuntimeError("VAD not available - torch dependency missing")
-
         self.vad = VADIterator(
             vad_model,
             sampling_rate=SAMPLE_RATE,
@@ -63,9 +54,6 @@ class StreamingVAD:
         return [tmp.name]
 
     def feed(self, frame_bytes: bytes) -> List[str]:
-        if not VAD_AVAILABLE:
-            return []
-
         out: List[str] = []
 
         pcm_f32 = np.frombuffer(frame_bytes, np.int16).astype("float32") / 32768
