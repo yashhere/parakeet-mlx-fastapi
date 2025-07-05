@@ -67,10 +67,10 @@ def cmd(
         help="Host to bind the server to (default: 0.0.0.0)",
     ),
     port: int = typer.Option(
-        8000,
+        8765,
         "--port",
         "-p",
-        help="Port to bind the server to (default: 8000)",
+        help="Port to bind the server to (default: 8765)",
     ),
     model: str = typer.Option(
         "mlx-community/parakeet-tdt-1.1b",

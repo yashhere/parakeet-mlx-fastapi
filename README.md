@@ -163,18 +163,18 @@ uv run ruff check --fix .
 
 ## API Usage
 
-Once the service is running, it will be available at `http://localhost:8000`.
+Once the service is running, it will be available at `http://localhost:8765`.
 
 ### API Documentation
 
-- Interactive API docs: `http://localhost:8000/docs`
-- OpenAPI schema: `http://localhost:8000/openapi.json`
+- Interactive API docs: `http://localhost:8765/docs`
+- OpenAPI schema: `http://localhost:8765/openapi.json`
 
 ### Basic Transcription
 
 ```bash
 # Upload an audio file for transcription
-curl -X POST "http://localhost:8000/transcribe" \
+curl -X POST "http://localhost:8765/transcribe" \
      -H "Content-Type: multipart/form-data" \
      -F "audio=@your_audio_file.wav"
 ```
@@ -190,7 +190,7 @@ cp .env.example .env
 ### Available Configuration Options
 
 - `PARAKEET_HOST`: Server host (default: 0.0.0.0)
-- `PARAKEET_PORT`: Server port (default: 8000)
+- `PARAKEET_PORT`: Server port (default: 8765)
 - `PARAKEET_WORKERS`: Number of worker processes (default: 1)
 - `TARGET_SR`: Target sample rate (default: 16000)
 - `MODEL_PRECISION`: Model precision (default: bf16)
@@ -227,7 +227,7 @@ parakeet-service --host 127.0.0.1 --port 9000 --model mlx-community/parakeet-tdt
 **Available Options:**
 
 - `--host, -h`: Host to bind the server to (default: 0.0.0.0)
-- `--port, -p`: Port to bind the server to (default: 8000)
+- `--port, -p`: Port to bind the server to (default: 8765)
 - `--model, -m`: Model name to use (default: mlx-community/parakeet-tdt-1.1b)
 - `--verbose, -v`: Increase verbosity (-v for WARNING, -vv for INFO, -vvv for DEBUG)
 
