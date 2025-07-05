@@ -223,10 +223,15 @@ async def transcribe_audio(
 
 
 @router.get("/debug/cfg")
-def show_cfg(_request: Request):
+def show_cfg(request: Request):
     """Show model configuration"""
+    # Get the actual model name being used (from app state or config default)
+    actual_model_name = getattr(
+        request.app.state, "model_name", config.DEFAULT_MODEL_NAME
+    )
+
     config_info = {
-        "model_name": config.MODEL_NAME,
+        "model_name": actual_model_name,
         "sample_rate": config.TARGET_SR,
         "precision": config.MODEL_PRECISION,
         "framework": "MLX",

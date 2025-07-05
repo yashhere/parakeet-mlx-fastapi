@@ -1,5 +1,7 @@
 # Parakeet-TDT 1.1B FastAPI Service
 
+[![Build Python Package](https://github.com/yashhere/parakeet-mlx-tdt-1.1b-fastapi/actions/workflows/build-package.yml/badge.svg)](https://github.com/yashhere/parakeet-mlx-tdt-1.1b-fastapi/actions/workflows/build-package.yml)
+
 A production-ready FastAPI service for speech-to-text transcription using the Parakeet-TDT 1.1B model. This service runs on macOS systems, powered by `uv` for fast and reliable dependency management.
 
 **⚠️ Platform Restriction: This package is only supported on macOS due to its dependency on MLX (Apple Silicon) and optimized audio processing libraries.**
@@ -25,19 +27,41 @@ A production-ready FastAPI service for speech-to-text transcription using the Pa
 
 ## Quick Start
 
-### Option 1: Install as a Tool with `uv` (Recommended for End Users)
+### Install with `uv tool` (Recommended)
 
 Install the service as a standalone tool that can be run from anywhere:
 
 ```bash
-# Install from local directory
-uv tool install .
-
-# Or install from git repository
+# Install directly from Git repository
 uv tool install git+https://github.com/yashhere/parakeet-mlx-tdt-1.1b-fastapi.git
+
+# Or install from local directory (if you have the source)
+uv tool install .
 
 # Run the service (available globally)
 parakeet-service
+```
+
+### Local Development
+
+For local development and testing:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/yashhere/parakeet-mlx-tdt-1.1b-fastapi.git
+cd parakeet-mlx-tdt-1.1b-fastapi
+
+# 2. Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 3. Install dependencies
+uv sync
+
+# 4. Run the service locally (without installing)
+uv run parakeet-service
+
+# 5. Run with custom options
+uv run parakeet-service --host 127.0.0.1 --port 9000 --model mlx-community/parakeet-tdt-0.6b -vv
 ```
 
 ### Tool Management
@@ -56,66 +80,32 @@ uv tool upgrade parakeet-tdt-fastapi
 
 # Uninstall the tool
 uv tool uninstall parakeet-tdt-fastapi
-
-# Install with specific extras (if available)
-uv tool install . --with dev
 ```
 
-### Option 2: Development with `uv` (Recommended)
+### Alternative Installation Methods
 
-1. Install `uv` if not already installed:
+#### Build and Install from Source
 
-   ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
+```bash
+# Build the distribution packages
+uv build
 
-2. Clone the repository and sync dependencies:
+# Install the wheel package
+uv pip install dist/parakeet_tdt_fastapi-0.1.0-py3-none-any.whl
 
-   ```bash
-   git clone <repository>
-   cd parakeet-mlx-tdt-1.1b-fastapi
-   uv sync
-   ```
+# Run the installed CLI
+parakeet-service
+```
 
-3. Run the service directly:
+#### Direct Python Module Execution
 
-   ```bash
-   uv run parakeet-service
-   ```
+```bash
+# Install dependencies
+uv sync
 
-### Option 3: Build and Install Binary Distribution
-
-1. Build the distribution packages:
-
-   ```bash
-   uv build
-   ```
-
-2. Install the wheel package:
-
-   ```bash
-   uv pip install dist/parakeet_tdt_fastapi-0.1.0-py3-none-any.whl
-   ```
-
-3. Run the installed CLI:
-
-   ```bash
-   parakeet-service
-   ```
-
-### Option 4: Direct Python Execution
-
-1. Install dependencies:
-
-   ```bash
-   uv sync
-   ```
-
-2. Run the main module directly:
-
-   ```bash
-   uv run python -m parakeet_service.main
-   ```
+# Run the main module directly
+uv run python -m parakeet_service.main
+```
 
 ## Why macOS Only?
 
@@ -213,6 +203,53 @@ cp .env.example .env
 - `MAX_AUDIO_DURATION`: Maximum audio duration in seconds (default: 45)
 - `PROCESSING_TIMEOUT`: Processing timeout in seconds (default: 120)
 - `LOG_LEVEL`: Logging level (default: INFO)
+
+## CLI Usage
+
+The service provides a simple command-line interface with essential options.
+
+### Basic Usage
+
+```bash
+# Start the service with default settings
+parakeet-service
+
+# Start with custom host and port
+parakeet-service --host 127.0.0.1 --port 9000
+
+# Start with a different model
+parakeet-service --model mlx-community/parakeet-tdt-0.6b
+
+# Start with verbose logging
+parakeet-service -vv
+
+# Combine multiple options
+parakeet-service --host 127.0.0.1 --port 9000 --model mlx-community/parakeet-tdt-0.6b -vvv
+```
+
+### CLI Options
+
+**Available Options:**
+
+- `--host, -h`: Host to bind the server to (default: 0.0.0.0)
+- `--port, -p`: Port to bind the server to (default: 8000)
+- `--model, -m`: Model name to use (default: mlx-community/parakeet-tdt-1.1b)
+- `--verbose, -v`: Increase verbosity (-v for WARNING, -vv for INFO, -vvv for DEBUG)
+
+### Environment Variables
+
+The service also supports configuration via environment variables:
+
+- `PARAKEET_WORKERS`: Number of worker processes (default: 1)
+
+### CLI Help
+
+Get help for the CLI:
+
+```bash
+# Show help and available options
+parakeet-service --help
+```
 
 ## Binary Distribution
 

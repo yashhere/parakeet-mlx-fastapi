@@ -1039,6 +1039,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "silero-vad" },
     { name = "soundfile" },
+    { name = "typer" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1062,6 +1063,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "silero-vad", specifier = ">=5.0.0" },
     { name = "soundfile", specifier = ">=0.12.0" },
+    { name = "typer", specifier = ">=0.9.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.20.0" },
 ]
 provides-extras = ["dev"]

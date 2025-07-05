@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from parakeet_mlx import from_pretrained  # type: ignore
 
-from parakeet_service.config import MODEL_NAME, MODEL_PRECISION, logger
+from parakeet_service.config import DEFAULT_MODEL_NAME, MODEL_PRECISION, logger
 
 
 def _to_builtin(obj):
@@ -20,10 +20,13 @@ def _to_builtin(obj):
 @asynccontextmanager
 async def lifespan(app):
     """Load model once per process; cleanup on shutdown."""
-    logger.info("Loading %s with MLX...", MODEL_NAME)
+    # Get model name from app state or fall back to config default
+    model_name = getattr(app.state, "model_name", DEFAULT_MODEL_NAME)
+
+    logger.info("Loading %s with MLX...", model_name)
 
     # Load model with parakeet-mlx
-    model = from_pretrained(MODEL_NAME)
+    model = from_pretrained(model_name)
 
     # Configure precision - MLX uses bf16 by default, but we can set fp32 if needed
     if MODEL_PRECISION == "fp32":
