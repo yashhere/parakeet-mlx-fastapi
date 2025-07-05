@@ -23,7 +23,7 @@ def main() -> None:
     spec = app.openapi()
     out_file = Path("openapi.yaml")
     out_file.write_text(yaml.safe_dump(spec, sort_keys=False), encoding="utf-8")
-    print(f"[export_openapi] wrote {out_file.resolve()}")
+    sys.stderr.write(f"[export_openapi] wrote {out_file.resolve()}\n")
 
 
 if __name__ == "__main__":

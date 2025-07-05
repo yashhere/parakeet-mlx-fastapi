@@ -92,6 +92,23 @@ This package is restricted to macOS for several reasons:
 
 ## Development with `uv`
 
+### Setting up Development Environment
+
+```bash
+# Install dev dependencies (includes pre-commit, ruff)
+uv sync --extra dev
+
+# Install pre-commit hooks
+uv run pre-commit install
+```
+
+#### Running Pre-commit Manually
+
+```bash
+# Run on all files
+uv run pre-commit run --all-files
+```
+
 ### Adding Dependencies
 
 ```bash
@@ -109,13 +126,14 @@ uv add "fastapi>=0.100.0"
 
 ```bash
 # Install dev dependencies
-uv sync --group dev
+uv sync --extra dev
 
-# Format code
-uv run black .
-
-# Lint code
+# Format and lint code
 uv run ruff check .
+uv run ruff format .
+
+# Or run both linting and formatting together
+uv run ruff check --fix .
 ```
 
 ## API Usage

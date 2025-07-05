@@ -13,7 +13,7 @@ from parakeet_service.stream_routes import router as stream_router
 def _check_platform() -> None:
     """Check if running on macOS, exit if not."""
     if platform.system() != "Darwin":
-        print(
+        logger.error(
             f"Error: parakeet-mlx-tdt-1.1b-fastapi is only supported on macOS. "
             f"Current platform: {platform.system()}"
         )

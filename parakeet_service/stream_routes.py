@@ -25,7 +25,6 @@ async def ws_asr(ws: WebSocket):
             depth=1,  # Number of encoder layers that preserve exact computation
             keep_original_attention=False,  # Use local attention for streaming
         ) as transcriber:
-
             logger.info("WebSocket streaming session started")
 
             while True:

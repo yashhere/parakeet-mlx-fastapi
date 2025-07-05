@@ -4,6 +4,7 @@ import asyncio
 import tempfile
 from collections import defaultdict
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -42,14 +43,15 @@ def health():
 async def transcribe_audio(
     request: Request,
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(..., media_type="audio/*"),
-    include_timestamps: bool = Form(
-        False,
-        description="Return char/word/segment offsets",
-    ),
-    should_chunk: bool = Form(
-        True, description="If true (default), enable chunking for long audio files"
-    ),
+    file: Annotated[UploadFile, File(media_type="audio/*")],
+    include_timestamps: Annotated[
+        bool,
+        Form(description="Return char/word/segment offsets"),
+    ] = False,
+    should_chunk: Annotated[
+        bool,
+        Form(description="If true (default), enable chunking for long audio files"),
+    ] = True,
 ):
     # Create temp file with appropriate extension
     suffix = Path(file.filename or "").suffix or ".wav"
@@ -149,7 +151,7 @@ async def transcribe_audio(
         if mp3_tmp_path and mp3_tmp_path.exists():
             mp3_tmp_path.unlink()
         raise
-    except BrokenPipeError:
+    except BrokenPipeError as err:
         logger.error("FFmpeg process terminated unexpectedly")
         if tmp_path.exists():
             tmp_path.unlink()
@@ -158,7 +160,7 @@ async def transcribe_audio(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Audio processing failed due to FFmpeg crash",
-        )
+        ) from err
     finally:
         await file.close()
 
