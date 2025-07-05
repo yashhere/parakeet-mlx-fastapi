@@ -5,8 +5,16 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 
-from fastapi import (APIRouter, BackgroundTasks, File, Form, HTTPException,
-                     Request, UploadFile, status)
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 
 from parakeet_service import config
 from parakeet_service.audio import ensure_mono_16k, schedule_cleanup

@@ -12,6 +12,7 @@ import yaml
 APP_PATH = "parakeet_service.main"
 APP_ATTR = "app"
 
+
 def main() -> None:
     try:
         mod = import_module(APP_PATH)
@@ -23,6 +24,7 @@ def main() -> None:
     out_file = Path("openapi.yaml")
     out_file.write_text(yaml.safe_dump(spec, sort_keys=False), encoding="utf-8")
     print(f"[export_openapi] wrote {out_file.resolve()}")
+
 
 if __name__ == "__main__":
     main()
