@@ -3,9 +3,10 @@ Write openapi.yaml for parakeet_service.main:app
 Usage:  python export_openapi.py
 """
 
+import sys
 from importlib import import_module
 from pathlib import Path
-import sys
+
 import yaml
 
 APP_PATH = "parakeet_service.main"

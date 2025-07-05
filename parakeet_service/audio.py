@@ -5,17 +5,17 @@ Audio helpers:
 """
 
 from __future__ import annotations
-from pathlib import Path
-from typing import Tuple, List
-import tempfile
 
-import soundfile as sf  # type: ignore
+import tempfile
+from pathlib import Path
+from typing import List, Tuple
+
 import librosa
 import numpy as np
+import soundfile as sf  # type: ignore
 from fastapi import BackgroundTasks, HTTPException, status
 
 from parakeet_service.config import TARGET_SR, logger
-
 
 SUPPORTED_EXTS: List[str] = [".wav", ".flac", ".mp3", ".ogg", ".opus"]
 

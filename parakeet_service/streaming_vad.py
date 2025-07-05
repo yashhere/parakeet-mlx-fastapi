@@ -1,9 +1,11 @@
 from __future__ import annotations
-import wave
+
 import tempfile
-import numpy as np
+import wave
 from typing import List
-from silero_vad import load_silero_vad, VADIterator  # type: ignore
+
+import numpy as np
+from silero_vad import VADIterator, load_silero_vad  # type: ignore
 
 # Load the model using the silero-vad package
 vad_model = load_silero_vad()

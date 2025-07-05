@@ -1,234 +1,305 @@
-# Parakeet-TDT MLX FastAPI STT Service
+# Parakeet FastAPI Service (macOS Only)
 
-A production-ready FastAPI service for high-accuracy English speech-to-text using NVIDIA's Parakeet-TDT models optimized for Apple Silicon via MLX. Implements both REST and WebSocket endpoints following the [OpenAI Audio API specification](https://platform.openai.com/docs/api-reference/audio) interface.
+A production-ready FastAPI service for speech-to-text transcription using the Parakeet-TDT-CTC 1.1B model. This service runs on macOS systems, powered by `uv` for fast and reliable dependency management.
+
+**⚠️ Platform Restriction: This package is only supported on macOS due to its dependency on MLX (Apple Silicon) and optimized audio processing libraries.**
 
 ## Features
 
-- **Apple Silicon Optimized**
-  - Native MLX implementation for M1/M2/M3 Macs
-  - Memory-efficient bf16 precision by default
-  - Optimized for local inference without CUDA dependency
+- High-accuracy English speech-to-text transcription
+- Real-time streaming support
+- Word/character/segment timestamps
+- RESTful API with FastAPI
+- macOS native optimization with MLX
+- Comprehensive logging and monitoring
+- `uv`-powered binary distribution and fast installs
 
-- **RESTful transcription**  
-  - `POST /transcribe` with multipart audio uploads
-  - Word/character/segment timestamps via parakeet-mlx
-  - OpenAI-compatible response schema
+## Requirements
 
-- **WebSocket streaming**  
-  - Real-time streaming transcription with MLX
-  - Context-aware streaming with configurable attention windows
-  - Supports 16kHz mono PCM input
+- **macOS only** (macOS 11.0+ recommended)
+- **Apple Silicon Mac** (M1, M2, M3, etc.) for optimal performance
+- Python 3.10+
+- FFmpeg
+- 4GB+ RAM (recommended)
+- `uv` package manager
 
-- **Intelligent chunking**  
-  - Built-in audio chunking with overlap for long files
-  - Memory-efficient processing via parakeet-mlx
-  - Configurable chunk duration and overlap
+## Quick Start
 
-- **Production-ready deployment**  
-  - Docker and Docker Compose support
-  - Health checks and configuration endpoints
-  - Environment variable configuration
+### Option 1: Development with `uv` (Recommended)
 
-- **Audio preprocessing**  
-  - Automatic downmixing and resampling
-  - File validation and format conversion
+1. Install `uv` if not already installed:
 
-## Table of Contents
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
 
-- [Prerequisites](#prerequisites)  
-- [Installation](#installation)  
-- [Configuration](#configuration)  
-- [Running the Server](#running-the-server)  
-- [Usage](#usage)  
-  - [REST API](#rest-api)  
-  - [WebSocket Streaming](#websocket-streaming)  
-- [Architecture Overview](#architecture-overview)  
-- [Environment Variables](#environment-variables)  
-- [Contributing](#contributing)  
-- [License](#license)  
+2. Clone the repository and sync dependencies:
 
-## Prerequisites
+   ```bash
+   git clone <repository>
+   cd parakeet-tdt-0.6b-v2-fastapi
+   uv sync
+   ```
 
-- Python 3.10+  
-- Apple Silicon Mac (M1/M2/M3) or Intel Mac for optimal performance
-- FFmpeg (for audio format conversion)
-- Docker Engine 24.0+ (for container deployment)
+3. Run the service directly:
 
-**Note**: While parakeet-mlx is optimized for Apple Silicon, it can run on other platforms but may not provide the same performance benefits as the native MLX implementation.
+   ```bash
+   uv run parakeet-service
+   ```
 
-## Installation
+### Option 2: Build and Install Binary Distribution
 
-### Local Development
+1. Build the distribution packages:
+
+   ```bash
+   uv build
+   ```
+
+2. Install the wheel package:
+
+   ```bash
+   uv pip install dist/parakeet_tdt_fastapi-0.1.0-py3-none-any.whl
+   ```
+
+3. Run the installed CLI:
+
+   ```bash
+   parakeet-service
+   ```
+
+### Option 3: Direct Python Execution
+
+1. Install dependencies:
+
+   ```bash
+   uv sync
+   ```
+
+2. Run the main module directly:
+
+   ```bash
+   uv run python -m parakeet_service.main
+   ```
+
+## Why macOS Only?
+
+This package is restricted to macOS for several reasons:
+
+1. **MLX Framework**: Optimized for Apple Silicon processors
+2. **Large Model Downloads**: The service downloads multi-GB language models that work best in unconstrained environments
+3. **Audio Processing**: Native macOS audio libraries provide optimal performance
+4. **Memory Management**: Better memory handling for large models on Apple Silicon
+
+## Development with `uv`
+
+### Adding Dependencies
+
 ```bash
-git clone https://github.com/your-repo/parakeet-mlx-fastapi.git
-cd parakeet-mlx-fastapi
+# Add a new dependency
+uv add package-name
 
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate
+# Add a development dependency
+uv add --dev package-name
 
-# Install dependencies (includes parakeet-mlx)
-pip install -r requirements.txt
-
-# Install FFmpeg if not already installed (macOS)
-brew install ffmpeg
+# Add with version constraints
+uv add "fastapi>=0.100.0"
 ```
 
-### Docker Deployment
+### Running Tests
+
 ```bash
-docker build -t parakeet-mlx-stt .
-docker run -d -p 8000:8000 parakeet-mlx-stt
+# Install test dependencies
+uv sync --group test
+
+# Run tests
+uv run pytest
 ```
 
-### Docker Compose
+### Code Quality
+
 ```bash
-docker-compose up --build
+# Install dev dependencies
+uv sync --group dev
+
+# Format code
+uv run black .
+
+# Lint code
+uv run ruff check .
+
+# Type checking
+uv run mypy parakeet_service/
 ```
+
+## API Usage
+
+Once the service is running, it will be available at `http://localhost:8000`.
+
+### API Documentation
+
+- Interactive API docs: `http://localhost:8000/docs`
+- OpenAPI schema: `http://localhost:8000/openapi.json`
+
+### Basic Transcription
+
+```bash
+# Upload an audio file for transcription
+curl -X POST "http://localhost:8000/transcribe" \
+     -H "Content-Type: multipart/form-data" \
+     -F "audio=@your_audio_file.wav"
+```
+
+### Streaming Transcription
+
+The service supports real-time streaming transcription. See the streaming endpoints in the API documentation.
 
 ## Configuration
 
-All configuration is managed through environment variables. Create a `.env` file with your preferences:
+The service can be configured using environment variables. Copy `.env.example` to `.env` and modify as needed:
 
-```ini
-# Model configuration
-MODEL_PRECISION=bf16
-BATCH_SIZE=4
-
-# Audio processing
-TARGET_SR=16000
-MAX_AUDIO_DURATION=30
-
-# System
-LOG_LEVEL=INFO
-PROCESSING_TIMEOUT=120
-```
-
-## Running the Server
-
-### Local Development
 ```bash
-uvicorn parakeet_service.main:app --host 0.0.0.0 --port 8000
+cp .env.example .env
 ```
 
-### Production
+### Available Configuration Options
+
+- `PARAKEET_HOST`: Server host (default: 0.0.0.0)
+- `PARAKEET_PORT`: Server port (default: 8000)
+- `PARAKEET_WORKERS`: Number of worker processes (default: 1)
+- `TARGET_SR`: Target sample rate (default: 16000)
+- `MODEL_PRECISION`: Model precision (default: bf16)
+- `BATCH_SIZE`: Batch size for processing (default: 4)
+- `MAX_AUDIO_DURATION`: Maximum audio duration in seconds (default: 45)
+- `PROCESSING_TIMEOUT`: Processing timeout in seconds (default: 120)
+- `LOG_LEVEL`: Logging level (default: INFO)
+
+## Binary Distribution
+
+### Building Binaries
+
 ```bash
-docker-compose up --build -d
+# Build wheel and source distribution
+uv build
+
+# Build only wheel
+uv build --wheel
+
+# Build only source distribution
+uv build --sdist
 ```
 
-## Usage
+### Installing from Binary
 
-### REST API
-
-#### Health Check
 ```bash
-curl http://localhost:8000/healthz
-# {"status":"ok"}
+# Install from local wheel
+uv pip install dist/parakeet_tdt_fastapi-0.1.0-py3-none-any.whl
+
+# Install with extras
+uv pip install "parakeet-tdt-fastapi[dev]"
 ```
 
-#### Transcription
+## File Structure
+
+```
+parakeet-tdt-0.6b-v2-fastapi/
+├── parakeet_service/          # Main application package
+│   ├── main.py               # FastAPI app and CLI entry point
+│   ├── routes.py             # API routes
+│   ├── stream_routes.py      # Streaming routes
+│   ├── model.py              # Model handling
+│   ├── config.py             # Configuration
+│   └── ...
+├── dist/                      # Built distribution packages
+├── pyproject.toml            # Project configuration and dependencies
+├── uv.lock                   # Locked dependencies
+├── requirements.txt          # Legacy pip requirements (deprecated)
+├── .env.example             # Environment configuration template
+└── README.md                # This file
+```
+
+## Migration from pip to uv
+
+If you're migrating from the previous pip-based setup:
+
+1. **Dependencies are now managed in `pyproject.toml`** instead of `requirements.txt`
+2. **Lock file**: `uv.lock` ensures reproducible builds
+3. **CLI command**: `uv run parakeet-service` instead of `python run_service.py`
+4. **Development**: Use `uv sync` instead of `pip install -r requirements.txt`
+
+## Performance Benefits of `uv`
+
+- **Faster installs**: Up to 10-100x faster than pip
+- **Better dependency resolution**: More reliable conflict resolution
+- **Reproducible builds**: Lock file ensures consistent environments
+- **Better isolation**: Virtual environments managed automatically
+- **Binary distributions**: Easy to create and distribute packages
+
+## Troubleshooting
+
+### Platform Check Failed
+
+If you see "parakeet-tdt-fastapi is only supported on macOS", you're trying to run this on a non-macOS system. This package requires macOS with Apple Silicon.
+
+### Service Won't Start
+
+1. Verify `uv` installation:
+
+   ```bash
+   uv --version
+   ```
+
+2. Test CLI directly:
+
+   ```bash
+   uv run parakeet-service
+   ```
+
+3. Check for dependency issues:
+
+   ```bash
+   uv sync
+   ```
+
+### `uv` Not Found
+
+If `uv` is not found, install it manually:
+
 ```bash
-curl -X POST http://localhost:8000/transcribe \
-  -F file="@audio.wav" \
-  -F include_timestamps=true \
-  -F should_chunk=true
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.cargo/bin:$PATH"
 ```
 
-**Parameters**:
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `file` | `audio/*` | Required | Audio file (wav, mp3, flac) |
-| `include_timestamps` | bool | false | Return word/segment timestamps |
-| `should_chunk` | bool | true | Enable audio chunking for long files |
+### Dependency Issues
 
-**Response**:
-```json
-{
-  "text": "Transcribed text content",
-  "timestamps": {
-    "words": [
-      {"text": "Hello", "start": 0.2, "end": 0.5},
-      {"text": "world", "start": 0.6, "end": 0.9}
-    ],
-    "segments": [
-      {"text": "Hello world", "start": 0.2, "end": 0.9}
-    ]
-  }
-}
+```bash
+# Regenerate lock file
+uv lock
+
+# Update dependencies
+uv sync --upgrade
+
+# Check for conflicts
+uv tree
 ```
-
-### WebSocket Streaming
-
-Connect to `ws://localhost:8000/ws` to stream audio:
-
-- **Input**: 16kHz mono PCM frames (int16)
-- **Output**: JSON messages with partial/final transcriptions
-- **Features**: Context-aware streaming with configurable attention windows
-
-**JavaScript Example**:
-```javascript
-const ws = new WebSocket("ws://localhost:8000/ws");
-const audioContext = new AudioContext();
-const processor = audioContext.createScriptProcessor(1024, 1, 1);
-
-processor.onaudioprocess = e => {
-  const pcmData = e.inputBuffer.getChannelData(0);
-  const int16Data = convertFloat32ToInt16(pcmData);
-  ws.send(int16Data);
-};
-
-ws.onmessage = evt => {
-  const data = JSON.parse(evt.data);
-  console.log("Transcription:", data.text);
-};
-```
-
-## Architecture Overview
-
-```mermaid
-graph LR
-A[Client] -->|HTTP| B[REST API]
-A -->|WebSocket| C[Streaming API]
-B --> D[parakeet-mlx Model]
-C --> E[MLX Streaming Context]
-E --> D
-D --> F[Response Formatter]
-F --> A
-```
-
-**Components**:
-1. **`main.py`** - App initialization and lifecycle management
-2. **`routes.py`** - REST endpoints implementation
-3. **`stream_routes.py`** - WebSocket endpoint with MLX streaming
-4. **`model.py`** - parakeet-mlx model interface
-5. **`audio.py`** - Audio preprocessing utilities
-6. **`config.py`** - Configuration management
-
-**MLX-Specific Features**:
-- **Streaming Context**: Context-aware streaming with configurable attention windows
-- **Memory Efficiency**: bf16 precision by default for optimal memory usage
-- **Built-in Chunking**: Intelligent audio chunking with overlap handling
-- **Apple Silicon Optimization**: Native MLX implementation for M-series chips
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MODEL_PRECISION` | bf16 | Model precision (bf16/fp32) |
-| `BATCH_SIZE` | 4 | Processing batch size |
-| `TARGET_SR` | 16000 | Target sample rate |
-| `MAX_AUDIO_DURATION` | 30 | Max audio length in seconds |
-| `LOG_LEVEL` | INFO | Logging verbosity |
-| `PROCESSING_TIMEOUT` | 120 | Processing timeout in seconds |
-
-## MLX Benefits
-
-- **Apple Silicon Native**: Optimized for M1/M2/M3 processors
-- **Memory Efficient**: bf16 precision reduces memory usage by ~50%
-- **Local Inference**: No need for cloud APIs or CUDA dependencies
-- **Streaming Support**: Real-time transcription with context awareness
-- **Easy Installation**: Simple pip install without complex dependencies
 
 ## Contributing
 
-1. Fork the repository and create your feature branch
-2. Submit a pull request with detailed description
+1. Fork the repository
+2. Create a feature branch
+3. Install development dependencies: `uv sync --group dev`
+4. Make your changes
+5. Run tests: `uv run pytest`
+6. Format code: `uv run black .`
+7. Submit a pull request
+
+## License
+
+See LICENSE file for details.
+
+## Support
+
+For issues and questions:
+
+1. Check the troubleshooting section above
+2. Review the service logs in the terminal output
+3. Open an issue with detailed information about your environment and the problem

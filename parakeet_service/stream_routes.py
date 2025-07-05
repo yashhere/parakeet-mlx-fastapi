@@ -1,6 +1,7 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-import numpy as np
 import mlx.core as mx
+import numpy as np
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
 from parakeet_service.config import logger
 
 router = APIRouter()

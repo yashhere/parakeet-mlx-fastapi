@@ -1,5 +1,6 @@
-from contextlib import asynccontextmanager
 import gc
+from contextlib import asynccontextmanager
+
 from parakeet_mlx import from_pretrained  # type: ignore
 
 from parakeet_service.config import MODEL_NAME, MODEL_PRECISION, logger

@@ -1,25 +1,17 @@
 from __future__ import annotations
+
 import asyncio
 import tempfile
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    File,
-    HTTPException,
-    UploadFile,
-    status,
-    Request,
-    Form,
-)
+from fastapi import (APIRouter, BackgroundTasks, File, Form, HTTPException,
+                     Request, UploadFile, status)
 
 from parakeet_service import config
 from parakeet_service.audio import ensure_mono_16k, schedule_cleanup
-from parakeet_service.schemas import TranscriptionResponse
 from parakeet_service.config import logger
-
+from parakeet_service.schemas import TranscriptionResponse
 
 router = APIRouter(tags=["speech"])
 

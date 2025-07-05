@@ -1,0 +1,103 @@
+[project]
+name = "parakeet-tdt-fastapi"
+version = "0.1.0"
+description = "High-accuracy English speech-to-text FastAPI service using Parakeet-TDT-CTC 1.1B model (Fork of Shadowfita/parakeet-tdt-0.6b-v2-fastapi) - macOS only"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Yash Agarwal", email = "13733968+yashhere@users.noreply.github.com"},
+]
+maintainers = [
+    {name = "Yash Agarwal", email = "13733968+yashhere@users.noreply.github.com"},
+]
+keywords = ["speech-to-text", "fastapi", "parakeet", "mlx", "transcription", "macos"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Private :: Do Not Upload",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.20.0",
+    "numpy>=1.20.0",
+    "pydantic>=2.0.0",
+    "python-multipart>=0.0.6",
+    "ffmpeg-python>=0.2.0",
+    "python-dotenv>=1.0.0",
+    "parakeet-mlx>=0.3.0",
+    "librosa>=0.10.0",
+    "soundfile>=0.12.0",
+    "silero_vad>=5.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
+    "ruff>=0.1.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
+]
+
+[project.scripts]
+parakeet-service = "parakeet_service.main:main"
+
+[project.urls]
+Homepage = "https://github.com/yashhere/parakeet-tdt-0.6b-v2-fastapi"
+Repository = "https://github.com/yashhere/parakeet-tdt-0.6b-v2-fastapi"
+"Original Repository" = "https://github.com/Shadowfita/parakeet-tdt-0.6b-v2-fastapi"
+"Upstream" = "https://github.com/Shadowfita/parakeet-tdt-0.6b-v2-fastapi"
+Issues = "https://github.com/yashhere/parakeet-tdt-0.6b-v2-fastapi/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+platforms = ["macos"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["parakeet_service"]
+platforms = ["macos"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/parakeet_service",
+    "/README.md",
+    "/LICENSE",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "A", "S", "T", "Q"]
+ignore = ["E501", "S101"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
