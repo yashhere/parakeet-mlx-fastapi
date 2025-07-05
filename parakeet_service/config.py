@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 
+import colorlog
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -47,13 +48,28 @@ def configure_logging(log_level: str = "INFO") -> None:
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
 
-    # Configure root logger with a single handler
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-        force=True,
+    # Create colorized formatter
+    color_formatter = colorlog.ColoredFormatter(
+        "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        log_colors={
+            "DEBUG": "cyan",
+            "INFO": "green",
+            "WARNING": "yellow",
+            "ERROR": "red",
+            "CRITICAL": "red,bg_white",
+        },
+        secondary_log_colors={},
+        style="%",
     )
+
+    # Create handler with colored formatter
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(color_formatter)
+
+    # Configure root logger
+    root_logger.setLevel(level)
+    root_logger.addHandler(handler)
 
     # Suppress noisy third-party loggers unless in debug mode
     if level > logging.DEBUG:
