@@ -9,7 +9,6 @@ A production-ready FastAPI service for speech-to-text transcription using the Pa
 ## Features
 
 - High-accuracy English speech-to-text transcription
-- Real-time streaming support
 - Word/character/segment timestamps
 - RESTful API with FastAPI
 - macOS native optimization with MLX
@@ -179,10 +178,6 @@ curl -X POST "http://localhost:8000/transcribe" \
      -H "Content-Type: multipart/form-data" \
      -F "audio=@your_audio_file.wav"
 ```
-
-### Streaming Transcription
-
-The service supports real-time streaming transcription. See the streaming endpoints in the API documentation.
 
 ## Configuration
 

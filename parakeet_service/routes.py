@@ -19,8 +19,10 @@ from fastapi import (
 
 from parakeet_service import config
 from parakeet_service.audio import ensure_mono_16k, schedule_cleanup
-from parakeet_service.config import logger
+from parakeet_service.config import get_logger
 from parakeet_service.schemas import TranscriptionResponse
+
+logger = get_logger("parakeet_service.routes")
 
 router = APIRouter(tags=["speech"])
 
@@ -75,6 +77,12 @@ async def transcribe_audio(
                     except asyncio.CancelledError:
                         logger.warning("File upload cancelled during MP3 saving")
                         raise
+                    except Exception as e:
+                        logger.error(f"Error reading file chunk: {e}")
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to read audio file: {e}",
+                        ) from e
                     if not chunk:
                         break
                     f.write(chunk)
@@ -108,44 +116,66 @@ async def transcribe_audio(
                     except asyncio.CancelledError:
                         logger.warning("File upload cancelled during processing")
                         raise
+                    except Exception as e:
+                        logger.error(f"Error reading file chunk: {e}")
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to read audio file: {e}",
+                        ) from e
                     if not chunk:
                         break
                     f.write(chunk)
 
         # Run FFmpeg if processing MP3
         if ffmpeg_cmd:
-            process = await asyncio.create_subprocess_exec(
-                *ffmpeg_cmd,
-                stdout=asyncio.subprocess.DEVNULL,  # We don't need stdout
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            # Read stderr in real-time
-            stderr_lines = []
-            if process.stderr:  # Check if stderr is not None
-                while True:
-                    line = await process.stderr.readline()
-                    if not line:
-                        break
-                    line_str = line.decode().strip()
-                    stderr_lines.append(line_str)
-                    logger.debug(f"FFmpeg: {line_str}")
-
-            # Wait for process to finish
-            return_code = await process.wait()
-            stderr_str = "\n".join(stderr_lines)
-
-            if return_code != 0:
-                logger.error(f"FFmpeg failed with return code {return_code}")
-                logger.error(f"FFmpeg error output: {stderr_str}")
-                raise HTTPException(
-                    status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                    detail=f"Invalid audio format: {stderr_str[:200]}",
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *ffmpeg_cmd,
+                    stdout=asyncio.subprocess.DEVNULL,  # We don't need stdout
+                    stderr=asyncio.subprocess.PIPE,
                 )
-            else:
-                logger.debug("FFmpeg completed successfully")
+
+                # Read stderr in real-time
+                stderr_lines = []
+                if process.stderr:  # Check if stderr is not None
+                    while True:
+                        line = await process.stderr.readline()
+                        if not line:
+                            break
+                        line_str = line.decode().strip()
+                        stderr_lines.append(line_str)
+                        logger.debug(f"FFmpeg: {line_str}")
+
+                # Wait for process to finish
+                return_code = await process.wait()
+                stderr_str = "\n".join(stderr_lines)
+
+                if return_code != 0:
+                    logger.error(f"FFmpeg failed with return code {return_code}")
+                    logger.error(f"FFmpeg error output: {stderr_str}")
+                    raise HTTPException(
+                        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                        detail=f"Invalid audio format: {stderr_str[:200]}",
+                    )
+                else:
+                    logger.debug("FFmpeg completed successfully")
+
+            except FileNotFoundError as e:
+                logger.error("FFmpeg not found on system")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="FFmpeg is required for MP3 processing but not found on system",
+                ) from e
+            except Exception as e:
+                logger.error(f"FFmpeg processing error: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Audio processing failed: {e}",
+                ) from e
+
     except asyncio.CancelledError:
         # Clean up temporary files if processing was canceled
+        logger.info("Request cancelled, cleaning up temporary files")
         if tmp_path.exists():
             tmp_path.unlink()
         if mp3_tmp_path and mp3_tmp_path.exists():
@@ -161,13 +191,40 @@ async def transcribe_audio(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Audio processing failed due to FFmpeg crash",
         ) from err
+    except HTTPException:
+        # Re-raise HTTP exceptions without wrapping
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during file processing: {e}")
+        logger.exception("File processing error details:")
+        if tmp_path.exists():
+            tmp_path.unlink()
+        if mp3_tmp_path and mp3_tmp_path.exists():
+            mp3_tmp_path.unlink()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during file processing",
+        ) from e
     finally:
-        await file.close()
+        try:
+            await file.close()
+        except Exception as e:
+            logger.warning(f"Error closing uploaded file: {e}")
 
     # Process audio to ensure mono 16kHz
-    original, to_model = ensure_mono_16k(tmp_path)
-
-    logger.info("transcribe(): processing audio file")
+    try:
+        original, to_model = ensure_mono_16k(tmp_path)
+        logger.info("transcribe(): processing audio file")
+    except HTTPException:
+        # Re-raise HTTP exceptions from audio processing
+        raise
+    except Exception as e:
+        logger.error(f"Audio preprocessing failed: {e}")
+        logger.exception("Audio preprocessing error details:")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Audio preprocessing failed: {e}",
+        ) from e
 
     # Clean up temporary files
     cleanup_files = [original, to_model]
@@ -176,7 +233,14 @@ async def transcribe_audio(
     schedule_cleanup(background_tasks, *cleanup_files)
 
     # Run ASR with parakeet-mlx (chunking handled internally)
-    model = request.app.state.asr_model
+    try:
+        model = request.app.state.asr_model
+    except AttributeError:
+        logger.error("ASR model not available in app state")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="ASR model not configured",
+        ) from None
 
     try:
         # Use parakeet-mlx's built-in chunking if enabled
@@ -213,27 +277,52 @@ async def transcribe_audio(
                 )
             timestamps = dict(merged)
 
-    except Exception as exc:
-        logger.exception("ASR failed")
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
+        logger.info(
+            f"Transcription completed successfully, text length: {len(merged_text)}"
+        )
+        return TranscriptionResponse(text=merged_text, timestamps=timestamps)
 
-    return TranscriptionResponse(text=merged_text, timestamps=timestamps)
+    except MemoryError as e:
+        logger.error("Insufficient memory for ASR processing")
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Audio file too large for available memory",
+        ) from e
+    except TimeoutError as e:
+        logger.error("ASR processing timed out")
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Audio processing timed out",
+        ) from e
+    except Exception as exc:
+        logger.error(f"ASR processing failed: {exc}")
+        logger.exception("ASR processing error details:")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Speech recognition processing failed",
+        ) from exc
 
 
 @router.get("/debug/cfg")
 def show_cfg(request: Request):
     """Show model configuration"""
-    # Get the actual model name being used (from app state or config default)
-    actual_model_name = getattr(
-        request.app.state, "model_name", config.DEFAULT_MODEL_NAME
-    )
+    try:
+        # Get the actual model name being used (from app state or config default)
+        actual_model_name = getattr(
+            request.app.state, "model_name", config.DEFAULT_MODEL_NAME
+        )
 
-    config_info = {
-        "model_name": actual_model_name,
-        "sample_rate": config.TARGET_SR,
-        "precision": config.MODEL_PRECISION,
-        "framework": "MLX",
-    }
-    return config_info
+        config_info = {
+            "model_name": actual_model_name,
+            "sample_rate": config.TARGET_SR,
+            "precision": config.MODEL_PRECISION,
+            "framework": "MLX",
+        }
+        return config_info
+    except Exception as e:
+        logger.error(f"Error retrieving configuration: {e}")
+        logger.exception("Configuration retrieval error details:")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve configuration",
+        ) from e

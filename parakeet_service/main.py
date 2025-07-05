@@ -6,10 +6,9 @@ import typer
 from fastapi import FastAPI
 
 from parakeet_service import config
-from parakeet_service.config import WORKERS, logger
+from parakeet_service.config import WORKERS, configure_logging, logger
 from parakeet_service.model import lifespan
 from parakeet_service.routes import router
-from parakeet_service.stream_routes import router as stream_router
 
 
 # Platform check - ensure this package only runs on macOS
@@ -45,7 +44,6 @@ def create_app(model_name: Optional[str] = None) -> FastAPI:
     server.include_router(router)
 
     # TODO: improve streaming and add support for other audio formats (maybe)
-    server.include_router(stream_router)
 
     logger.info("FastAPI app initialised")
     return server
@@ -89,44 +87,95 @@ def cmd(
     ),
 ) -> None:
     """Start the Parakeet speech-to-text service."""
-    import uvicorn
+    try:
+        import uvicorn
 
-    # Set log level based on verbosity
-    if verbose == 0:
-        log_level = "error"
-    elif verbose == 1:
-        log_level = "warning"
-    elif verbose == 2:
-        log_level = "info"
-    else:  # verbose >= 3
-        log_level = "debug"
+        # Set log level based on verbosity
+        if verbose == 0:
+            log_level = "ERROR"
+        elif verbose == 1:
+            log_level = "WARNING"
+        elif verbose == 2:
+            log_level = "INFO"
+        else:  # verbose >= 3
+            log_level = "DEBUG"
 
-    # Log the model being used
-    if model != "mlx-community/parakeet-tdt-1.1b":
-        logger.info(f"Using model: {model}")
+        # Configure logging early with the determined level
+        configure_logging(log_level)
 
-    logger.info(f"Starting Parakeet service on {host}:{port}")
+        # Log the model being used
+        if model != "mlx-community/parakeet-tdt-1.1b":
+            logger.info(f"Using model: {model}")
 
-    # Create app with custom model if specified
-    app_str = "parakeet_service.main:app"
-    if model != config.DEFAULT_MODEL_NAME:
-        global app
-        app = create_app(model_name=model)
+        logger.info(f"Starting Parakeet service on {host}:{port}")
 
-    uvicorn.run(
-        app_str,
-        host=host,
-        port=port,
-        workers=WORKERS,
-        log_level=log_level,
-        access_log=True,
-        reload=False,
-    )
+        # Configure custom model if specified
+        if model != config.DEFAULT_MODEL_NAME:
+            try:
+                # Create a new app instance with the custom model
+                app_instance = create_app(model_name=model)
+                logger.info(f"Successfully configured custom model: {model}")
+
+                # Update the global app reference for uvicorn to pick up
+                global app
+                app = app_instance
+
+            except Exception as e:
+                logger.error(f"Failed to configure model '{model}': {e}")
+                logger.exception("Model configuration error details:")
+                sys.exit(1)
+
+        # Start the server with proper logging configuration
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            workers=WORKERS,
+            log_level=log_level.lower(),
+            access_log=True,
+            reload=False,
+            # Disable uvicorn's default logging configuration to use ours
+            log_config=None,
+        )
+
+    except KeyboardInterrupt:
+        logger.info("Service stopped by user")
+        sys.exit(0)
+    except ImportError as e:
+        logger.error(f"Missing required dependency: {e}")
+        logger.error("Please ensure all dependencies are installed")
+        sys.exit(1)
+    except PermissionError as e:
+        logger.error(f"Permission denied: {e}")
+        logger.error(
+            f"Unable to bind to {host}:{port} - check permissions or try a different port"
+        )
+        sys.exit(1)
+    except OSError as e:
+        if "Address already in use" in str(e):
+            logger.error(
+                f"Port {port} is already in use. Please choose a different port or stop the existing service."
+            )
+        else:
+            logger.error(f"Network error: {e}")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Failed to start service: {e}")
+        logger.exception("Startup error details:")
+        sys.exit(1)
 
 
 def main() -> None:
     """Entry point for the CLI."""
-    cli_app()
+    try:
+        cli_app()
+    except KeyboardInterrupt:
+        logger.info("Service stopped by user")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"CLI error: {e}")
+        logger.exception("CLI error details:")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

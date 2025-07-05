@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 
 from dotenv import load_dotenv
 
@@ -16,5 +17,67 @@ WORKERS = int(os.getenv("PARAKEET_WORKERS", "1"))
 TARGET_SR = 16000
 MODEL_PRECISION = "bf16"
 
-# Create logger (will inherit configuration from uvicorn)
-logger = logging.getLogger("parakeet_service")
+# Logging configuration
+_logging_configured = False
+
+
+def configure_logging(log_level: str = "INFO") -> None:
+    """
+    Configure logging for the entire application.
+    This should be called once at application startup.
+    """
+    global _logging_configured
+
+    if _logging_configured:
+        return
+
+    # Convert string level to logging constant
+    level_map = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
+    }
+
+    level = level_map.get(log_level.upper(), logging.INFO)
+
+    # Clear any existing handlers to prevent duplicates
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    # Configure root logger with a single handler
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True,
+    )
+
+    # Suppress noisy third-party loggers unless in debug mode
+    if level > logging.DEBUG:
+        logging.getLogger("mlx").setLevel(logging.WARNING)
+        logging.getLogger("librosa").setLevel(logging.WARNING)
+        logging.getLogger("soundfile").setLevel(logging.WARNING)
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("requests").setLevel(logging.WARNING)
+
+    _logging_configured = True
+
+
+def get_logger(name: str) -> logging.Logger:
+    """
+    Get a logger instance with the given name.
+    Ensures logging is configured if not already done.
+    """
+    # Configure logging with default level if not already configured
+    if not _logging_configured:
+        log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+        configure_logging(log_level)
+
+    return logging.getLogger(name)
+
+
+# Create default logger instance
+logger = get_logger("parakeet_service")
