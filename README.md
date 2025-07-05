@@ -25,7 +25,43 @@ A production-ready FastAPI service for speech-to-text transcription using the Pa
 
 ## Quick Start
 
-### Option 1: Development with `uv` (Recommended)
+### Option 1: Install as a Tool with `uv` (Recommended for End Users)
+
+Install the service as a standalone tool that can be run from anywhere:
+
+```bash
+# Install from local directory
+uv tool install .
+
+# Or install from git repository
+uv tool install git+https://github.com/yashhere/parakeet-mlx-tdt-1.1b-fastapi.git
+
+# Run the service (available globally)
+parakeet-service
+```
+
+### Tool Management
+
+After installing with `uv tool`, you can manage the installation:
+
+```bash
+# List all installed tools
+uv tool list
+
+# Show details about the installed tool
+uv tool show parakeet-tdt-fastapi
+
+# Upgrade to the latest version
+uv tool upgrade parakeet-tdt-fastapi
+
+# Uninstall the tool
+uv tool uninstall parakeet-tdt-fastapi
+
+# Install with specific extras (if available)
+uv tool install . --with dev
+```
+
+### Option 2: Development with `uv` (Recommended)
 
 1. Install `uv` if not already installed:
 
@@ -47,7 +83,7 @@ A production-ready FastAPI service for speech-to-text transcription using the Pa
    uv run parakeet-service
    ```
 
-### Option 2: Build and Install Binary Distribution
+### Option 3: Build and Install Binary Distribution
 
 1. Build the distribution packages:
 
@@ -67,7 +103,7 @@ A production-ready FastAPI service for speech-to-text transcription using the Pa
    parakeet-service
    ```
 
-### Option 3: Direct Python Execution
+### Option 4: Direct Python Execution
 
 1. Install dependencies:
 
