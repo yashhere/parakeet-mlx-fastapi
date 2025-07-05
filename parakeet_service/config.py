@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-MODEL_NAME = "mlx-community/parakeet-tdt_ctc-1.1b"
+MODEL_NAME = "mlx-community/parakeet-tdt-1.1b"
 
 # Configuration from environment variables
 TARGET_SR = int(os.getenv("TARGET_SR", "16000"))

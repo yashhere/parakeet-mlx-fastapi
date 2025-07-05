@@ -1,7 +1,7 @@
 [project]
 name = "parakeet-tdt-fastapi"
 version = "0.1.0"
-description = "High-accuracy English speech-to-text FastAPI service using Parakeet-TDT-CTC 1.1B model (Fork of Shadowfita/parakeet-tdt-0.6b-v2-fastapi) - macOS only"
+description = "High-accuracy English speech-to-text FastAPI service using Parakeet-TDT 1.1B model (Fork of Shadowfita/parakeet-tdt-0.6b-v2-fastapi) - macOS only"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -43,28 +43,20 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "httpx>=0.24.0",
     "ruff>=0.1.0",
     "black>=23.0.0",
     "mypy>=1.0.0",
-]
-test = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "httpx>=0.24.0",
 ]
 
 [project.scripts]
 parakeet-service = "parakeet_service.main:main"
 
 [project.urls]
-Homepage = "https://github.com/yashhere/parakeet-tdt-0.6b-v2-fastapi"
-Repository = "https://github.com/yashhere/parakeet-tdt-0.6b-v2-fastapi"
+Homepage = "https://github.com/yashhere/parakeet-mlx-tdt-1.1b-fastapi"
+Repository = "https://github.com/yashhere/parakeet-mlx-tdt-1.1b-fastapi"
 "Original Repository" = "https://github.com/Shadowfita/parakeet-tdt-0.6b-v2-fastapi"
 "Upstream" = "https://github.com/Shadowfita/parakeet-tdt-0.6b-v2-fastapi"
-Issues = "https://github.com/yashhere/parakeet-tdt-0.6b-v2-fastapi/issues"
+Issues = "https://github.com/yashhere/parakeet-mlx-tdt-1.1b-fastapi/issues"
 
 [build-system]
 requires = ["hatchling"]

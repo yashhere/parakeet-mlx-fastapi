@@ -1,6 +1,6 @@
-# Parakeet FastAPI Service (macOS Only)
+# Parakeet-TDT 1.1B FastAPI Service
 
-A production-ready FastAPI service for speech-to-text transcription using the Parakeet-TDT-CTC 1.1B model. This service runs on macOS systems, powered by `uv` for fast and reliable dependency management.
+A production-ready FastAPI service for speech-to-text transcription using the Parakeet-TDT 1.1B model. This service runs on macOS systems, powered by `uv` for fast and reliable dependency management.
 
 **⚠️ Platform Restriction: This package is only supported on macOS due to its dependency on MLX (Apple Silicon) and optimized audio processing libraries.**
 
@@ -37,7 +37,7 @@ A production-ready FastAPI service for speech-to-text transcription using the Pa
 
    ```bash
    git clone <repository>
-   cd parakeet-tdt-0.6b-v2-fastapi
+   cd parakeet-mlx-tdt-1.1b-fastapi
    uv sync
    ```
 
@@ -105,17 +105,7 @@ uv add --dev package-name
 uv add "fastapi>=0.100.0"
 ```
 
-### Running Tests
-
-```bash
-# Install test dependencies
-uv sync --group test
-
-# Run tests
-uv run pytest
-```
-
-### Code Quality
+### Running Development
 
 ```bash
 # Install dev dependencies
@@ -201,7 +191,7 @@ uv pip install "parakeet-tdt-fastapi[dev]"
 ## File Structure
 
 ```
-parakeet-tdt-0.6b-v2-fastapi/
+parakeet-mlx-tdt-1.1b-fastapi/
 ├── parakeet_service/          # Main application package
 │   ├── main.py               # FastAPI app and CLI entry point
 │   ├── routes.py             # API routes
@@ -288,9 +278,8 @@ uv tree
 2. Create a feature branch
 3. Install development dependencies: `uv sync --group dev`
 4. Make your changes
-5. Run tests: `uv run pytest`
-6. Format code: `uv run black .`
-7. Submit a pull request
+5. Format code: `uv run black .`
+6. Submit a pull request
 
 ## License
 

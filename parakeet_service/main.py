@@ -14,7 +14,7 @@ def _check_platform() -> None:
     """Check if running on macOS, exit if not."""
     if platform.system() != "Darwin":
         print(
-            f"Error: parakeet-tdt-fastapi is only supported on macOS. "
+            f"Error: parakeet-mlx-tdt-1.1b-fastapi is only supported on macOS. "
             f"Current platform: {platform.system()}"
         )
         sys.exit(1)
@@ -26,7 +26,7 @@ _check_platform()
 
 def create_app() -> FastAPI:
     server = FastAPI(
-        title="Parakeet-TDT-CTC 1.1B v2 STT service",
+        title="Parakeet-TDT 1.1B STT service",
         version="0.0.1",
         description=(
             "High-accuracy English speech-to-text "

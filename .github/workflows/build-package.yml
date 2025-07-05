@@ -1,0 +1,108 @@
+name: Build Python Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create GitHub Release'
+        required: false
+        default: false
+        type: boolean
+      release_tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: false
+        type: string
+      release_name:
+        description: 'Release name'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark as prerelease'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Python Package
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Build package
+        run: uv build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Get package version
+        id: package_version
+        run: |
+          VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set release variables
+        id: release_vars
+        run: |
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            echo "tag=${{ inputs.release_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v${{ steps.package_version.outputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+          if [ -n "${{ inputs.release_name }}" ]; then
+            echo "name=${{ inputs.release_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=Release ${{ steps.package_version.outputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        if: ${{ inputs.create_release }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_vars.outputs.tag }}
+          name: ${{ steps.release_vars.outputs.name }}
+          files: dist/*
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          body: |
+            ## Python Package Distribution
+
+            This release contains the built Python package for `parakeet-mlx-tdt-1.1b-fastapi` v${{ steps.package_version.outputs.version }}.
+
+            ### Installation from Release
+
+            Download the wheel file (.whl) and install it using pip:
+            ```bash
+            pip install parakeet_tdt_fastapi-${{ steps.package_version.outputs.version }}-py3-none-any.whl
+            ```
+
+            Or download the source distribution (.tar.gz) and install:
+            ```bash
+            pip install parakeet-mlx-tdt-1.1b-fastapi-${{ steps.package_version.outputs.version }}.tar.gz
+            ```
+
+            ### Files in this release:
+            - `*.whl` - Wheel distribution (recommended for installation)
+            - `*.tar.gz` - Source distribution
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
