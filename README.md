@@ -116,9 +116,6 @@ uv run black .
 
 # Lint code
 uv run ruff check .
-
-# Type checking
-uv run mypy parakeet_service/
 ```
 
 ## API Usage
