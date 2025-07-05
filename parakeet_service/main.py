@@ -134,6 +134,7 @@ def cmd(
             log_level=log_level.lower(),
             access_log=True,
             reload=False,
+            lifespan="on",
             # Disable uvicorn's default logging configuration to use ours
             log_config=None,
         )

@@ -28,8 +28,19 @@ router = APIRouter(tags=["speech"])
 
 
 @router.get("/healthz", summary="Liveness/readiness probe")
-def health():
-    return {"status": "ok"}
+def health(request: Request):
+    # Check if model is loaded successfully
+    model_loaded = getattr(request.app.state, "model_loaded", False)
+    model_error = getattr(request.app.state, "model_error", None)
+
+    if model_loaded:
+        return {"status": "ok", "model_status": "loaded"}
+    elif model_error:
+        # Log the detailed error but don't expose it to clients
+        logger.warning(f"Model loading failed: {model_error}")
+        return {"status": "degraded", "model_status": "failed"}
+    else:
+        return {"status": "starting", "model_status": "loading"}
 
 
 @router.post(
@@ -234,12 +245,30 @@ async def transcribe_audio(
 
     # Run ASR with parakeet-mlx (chunking handled internally)
     try:
+        # Check if model loaded successfully
+        if not getattr(request.app.state, "model_loaded", False):
+            error_msg = getattr(
+                request.app.state, "model_error", "Model failed to load"
+            )
+            logger.error(f"ASR model not available: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Speech recognition service temporarily unavailable",
+            )
+
         model = request.app.state.asr_model
+        if model is None:
+            logger.error("ASR model is None despite model_loaded being True")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Speech recognition service temporarily unavailable",
+            )
+
     except AttributeError:
-        logger.error("ASR model not available in app state")
+        logger.error("ASR model state not available in app state")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="ASR model not configured",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Speech recognition service temporarily unavailable",
         ) from None
 
     try:
