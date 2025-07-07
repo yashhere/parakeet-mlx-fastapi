@@ -1,6 +1,6 @@
 [project]
 name = "parakeet-mlx-fastapi"
-version = "0.1.0"
+dynamic = ["version"]
 description = "High-accuracy English speech-to-text FastAPI service using Parakeet-MLX models (Fork of Shadowfita/parakeet-mlx-0.6b-v2-fastapi)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -59,8 +59,14 @@ Repository = "https://github.com/yashhere/parakeet-mlx-fastapi"
 Issues = "https://github.com/yashhere/parakeet-mlx-fastapi/issues"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+fallback-version = "0.0.0"
 
 [tool.hatch.build]
 platforms = ["macos"]
