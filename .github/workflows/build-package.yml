@@ -87,18 +87,25 @@ jobs:
           body: |
             ## Python Package Distribution
 
-            This release contains the built Python package for `parakeet-mlx-tdt-1.1b-fastapi` v${{ steps.package_version.outputs.version }}.
+            This release contains the built Python package for `parakeet-mlx-fastapi` v${{ steps.package_version.outputs.version }}.
 
             ### Installation from Release
 
+            #### Using uv tool (Recommended)
+            Install directly from the GitHub release artifact:
+            ```bash
+            uv tool install https://github.com/yashhere/parakeet-mlx-fastapi/releases/download/${{ steps.release_vars.outputs.tag }}/parakeet_mlx_fastapi-${{ steps.package_version.outputs.version }}-py3-none-any.whl
+            ```
+
+            #### Using pip
             Download the wheel file (.whl) and install it using pip:
             ```bash
-            pip install parakeet_tdt_fastapi-${{ steps.package_version.outputs.version }}-py3-none-any.whl
+            pip install parakeet_mlx_fastapi-${{ steps.package_version.outputs.version }}-py3-none-any.whl
             ```
 
             Or download the source distribution (.tar.gz) and install:
             ```bash
-            pip install parakeet-mlx-tdt-1.1b-fastapi-${{ steps.package_version.outputs.version }}.tar.gz
+            pip install parakeet-mlx-fastapi-${{ steps.package_version.outputs.version }}.tar.gz
             ```
 
             ### Files in this release:

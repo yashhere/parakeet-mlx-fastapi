@@ -733,7 +733,7 @@ wheels = [
 ]
 
 [[package]]
-name = "parakeet-tdt-fastapi"
+name = "parakeet-mlx-fastapi"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

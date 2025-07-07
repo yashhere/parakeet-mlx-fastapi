@@ -16,7 +16,7 @@ def _check_platform() -> None:
     """Check if running on macOS, exit if not."""
     if platform.system() != "Darwin":
         logger.error(
-            f"Error: parakeet-mlx-tdt-1.1b-fastapi is only supported on macOS. "
+            f"Error: parakeet-mlx-fastapi is only supported on macOS. "
             f"Current platform: {platform.system()}"
         )
         sys.exit(1)
@@ -28,7 +28,7 @@ _check_platform()
 
 def create_app(model_name: Optional[str] = None) -> FastAPI:
     server = FastAPI(
-        title="Parakeet-TDT 1.1B STT service",
+        title="Parakeet-MLX STT service",
         version="0.0.1",
         description=(
             "High-accuracy English speech-to-text "
@@ -54,7 +54,7 @@ app = create_app()
 
 # Create typer app
 cli_app = typer.Typer(
-    help="High-accuracy English speech-to-text FastAPI service using Parakeet-TDT model"
+    help="High-accuracy English speech-to-text FastAPI service using Parakeet models"
 )
 
 
@@ -104,7 +104,7 @@ def cmd(
         configure_logging(log_level)
 
         # Log the model being used
-        if model != "mlx-community/parakeet-tdt-1.1b":
+        if model != config.DEFAULT_MODEL_NAME:
             logger.info(f"Using model: {model}")
 
         logger.info(f"Starting Parakeet service on {host}:{port}")

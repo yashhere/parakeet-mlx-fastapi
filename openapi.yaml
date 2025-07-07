@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Parakeet-TDT 1.1B STT service
+  title: Parakeet-MLX STT service
   description: High-accuracy English speech-to-text with optional word/char/segment
     timestamps.
   version: 0.0.1
