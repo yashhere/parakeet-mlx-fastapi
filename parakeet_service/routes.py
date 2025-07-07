@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
-from collections import defaultdict
+import time
+import zlib
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, List, Literal, Optional
 
 from fastapi import (
     APIRouter,
@@ -16,11 +17,18 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import PlainTextResponse
+from parakeet_mlx.cli import _aligned_sentence_to_dict, to_srt, to_txt, to_vtt
 
 from parakeet_service import config
 from parakeet_service.audio import ensure_mono_16k, schedule_cleanup
 from parakeet_service.config import get_logger
-from parakeet_service.schemas import TranscriptionResponse
+from parakeet_service.schemas import (
+    TranscriptionResponse,
+    TranscriptionSegment,
+    TranscriptionUsage,
+    TranscriptionWord,
+)
 
 logger = get_logger("parakeet_service.routes")
 
@@ -44,28 +52,72 @@ def health(request: Request):
 
 
 @router.post(
-    "/transcribe",
-    response_model=TranscriptionResponse,
-    summary="Transcribe an audio file",
-)
-@router.post(
     "/audio/transcriptions",
+    summary="Transcribe an audio file (OpenAI-compatible)",
     response_model=TranscriptionResponse,
-    summary="Transcribe an audio file",
+    response_model_exclude_none=True,
 )
 async def transcribe_audio(
     request: Request,
     background_tasks: BackgroundTasks,
-    file: Annotated[UploadFile, File(media_type="audio/*")],
-    include_timestamps: Annotated[
-        bool,
-        Form(description="Return char/word/segment offsets"),
+    file: Annotated[UploadFile, File(description="The audio file to transcribe")],
+    model: Annotated[
+        str, Form(description="Model to use for transcription")
+    ] = "parakeet",
+    language: Annotated[
+        Optional[str],
+        Form(description="Language of the input audio (only 'en' supported)"),
+    ] = None,
+    prompt: Annotated[
+        Optional[str], Form(description="Not supported by parakeet (ignored)")
+    ] = None,
+    response_format: Annotated[
+        Literal["json", "text", "srt", "verbose_json", "vtt"],
+        Form(description="Format of the output"),
+    ] = "json",
+    temperature: Annotated[
+        float, Form(description="Sampling temperature between 0 and 1", ge=0.0, le=1.0)
+    ] = 0.0,
+    timestamp_granularities: Annotated[
+        Optional[List[Literal["word", "segment"]]],
+        Form(
+            description="Timestamp granularities to populate (requires verbose_json format)"
+        ),
+    ] = None,
+    chunking_strategy: Annotated[
+        Literal["auto"],
+        Form(description="Chunking strategy to use (always 'auto' for parakeet)"),
+    ] = "auto",
+    stream: Annotated[
+        Optional[bool], Form(description="Not supported by parakeet (ignored)")
     ] = False,
-    should_chunk: Annotated[
-        bool,
-        Form(description="If true (default), enable chunking for long audio files"),
-    ] = True,
 ):
+    # Validate language constraint
+    if language and language != "en":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Parakeet only supports English language ('en'). Other languages are not supported.",
+        )
+
+    # Validate timestamp granularities constraint
+    if timestamp_granularities and response_format != "verbose_json":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="timestamp_granularities parameter requires response_format to be 'verbose_json'",
+        )
+
+    # Log ignored prompt parameter
+    if prompt:
+        logger.warning(
+            "prompt parameter is not supported by parakeet and will be ignored"
+        )
+
+    # Log ignored stream parameter
+    if stream:
+        logger.warning(
+            "stream parameter is not supported by parakeet and will be ignored"
+        )
+
     # Create temp file with appropriate extension
     suffix = Path(file.filename or "").suffix or ".wav"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -243,9 +295,7 @@ async def transcribe_audio(
         cleanup_files.append(mp3_tmp_path)
     schedule_cleanup(background_tasks, *cleanup_files)
 
-    # Run ASR with parakeet-mlx (chunking handled internally)
     try:
-        # Check if model loaded successfully
         if not getattr(request.app.state, "model_loaded", False):
             error_msg = getattr(
                 request.app.state, "model_error", "Model failed to load"
@@ -272,44 +322,107 @@ async def transcribe_audio(
         ) from None
 
     try:
-        # Use parakeet-mlx's built-in chunking if enabled
-        if should_chunk:
-            # Enable chunking with 60-second chunks and 15-second overlap
-            result = model.transcribe(
-                str(to_model), chunk_duration=60.0, overlap_duration=15.0
-            )
-        else:
-            # Process without chunking
-            result = model.transcribe(str(to_model))
+        start_time = time.time()
 
-        merged_text = result.text
-        timestamps = None
+        chunk_duration_param = 60 * 2
+        overlap_duration_param = 15
 
-        if include_timestamps and hasattr(result, "sentences"):
-            # Convert parakeet-mlx AlignedSentence objects to compatible format
-            merged = defaultdict(list)
-            for sentence in result.sentences:
-                # Create word-level timestamps from tokens if available
-                if hasattr(sentence, "tokens"):
-                    for token in sentence.tokens:
-                        merged["words"].append(
-                            {"text": token.text, "start": token.start, "end": token.end}
-                        )
-
-                # Add segment-level timestamps
-                merged["segments"].append(
-                    {
-                        "text": sentence.text,
-                        "start": sentence.start,
-                        "end": sentence.end,
-                    }
-                )
-            timestamps = dict(merged)
-
-        logger.info(
-            f"Transcription completed successfully, text length: {len(merged_text)}"
+        result = model.transcribe(
+            str(to_model),
+            chunk_duration=chunk_duration_param,
+            overlap_duration=overlap_duration_param,
         )
-        return TranscriptionResponse(text=merged_text, timestamps=timestamps)
+
+        duration = time.time() - start_time
+        merged_text = result.text
+
+        # Determine timestamp granularities to include
+        include_words = False
+        include_segments = False
+
+        audio_duration = _get_audio_duration(result, to_model)
+
+        if timestamp_granularities:
+            include_words = "word" in timestamp_granularities
+            include_segments = "segment" in timestamp_granularities
+        elif response_format == "verbose_json":
+            # Default timestamp granularity is segment for verbose_json
+            include_segments = True
+
+        if response_format == "text":
+            content = to_txt(result)
+            return PlainTextResponse(content=content, media_type="text/plain")
+
+        elif response_format == "srt":
+            content = to_srt(result, highlight_words=False)
+            return PlainTextResponse(content=content, media_type="application/x-subrip")
+
+        elif response_format == "vtt":
+            content = to_vtt(result, highlight_words=False)
+            return PlainTextResponse(content=content, media_type="text/vtt")
+
+        else:  # json or verbose_json
+            response_data = {
+                "task": "transcribe",
+                "language": "english",
+                "duration": audio_duration,
+                "text": merged_text,
+            }
+
+            # Add usage information (rounded to nearest integer)
+            response_data["usage"] = TranscriptionUsage(seconds=round(audio_duration))
+
+            # Add words OR segments (mutually exclusive) based on timestamp_granularities
+            if include_words:
+                # Only include words, not segments
+                words = []
+                for sentence in result.sentences:
+                    if hasattr(sentence, "tokens") and sentence.tokens:
+                        for token in sentence.tokens:
+                            words.append(
+                                TranscriptionWord(
+                                    word=token.text.strip(),
+                                    start=round(token.start, 3),
+                                    end=round(token.end, 3),
+                                )
+                            )
+                if words:
+                    response_data["words"] = words
+            elif include_segments:
+                # Only include segments, not words
+                segments = []
+                for i, sentence in enumerate(result.sentences):
+                    sentence_dict = _aligned_sentence_to_dict(sentence)
+
+                    # Extract token IDs from the sentence tokens
+                    token_ids = []
+                    for token in sentence.tokens:
+                        token_ids.append(token.id)
+
+                    # Convert to OpenAI-compatible segment format
+                    segment = TranscriptionSegment(
+                        id=i,
+                        seek=0,  # parakeet-mlx doesn't provide seek offset
+                        start=sentence_dict["start"],
+                        end=sentence_dict["end"],
+                        text=sentence_dict["text"],
+                        tokens=token_ids,
+                        temperature=temperature,
+                        avg_logprob=-0.5,  # Default reasonable value
+                        compression_ratio=len(sentence_dict["text"])
+                        / len(zlib.compress(sentence_dict["text"].encode("utf-8"))),
+                        no_speech_prob=0.0,
+                    )
+                    segments.append(segment)
+                if segments:
+                    response_data["segments"] = segments
+
+            logger.info(
+                "Transcription completed successfully, text length: {}, processing time: {:.2f}s".format(
+                    len(merged_text), duration
+                )
+            )
+            return TranscriptionResponse(**response_data)
 
     except MemoryError as e:
         logger.error("Insufficient memory for ASR processing")
@@ -330,6 +443,34 @@ async def transcribe_audio(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Speech recognition processing failed",
         ) from exc
+
+
+def _calculate_audio_duration(audio_path: Path) -> float:
+    """Calculate audio duration from file."""
+    try:
+        import wave
+
+        with wave.open(str(audio_path), "rb") as wav_file:
+            frames = wav_file.getnframes()
+            sample_rate = wav_file.getframerate()
+            return frames / sample_rate
+    except Exception:
+        # Fallback - return 0 if we can't determine duration
+        return 0.0
+
+
+def _get_audio_duration(result, audio_path: Path) -> float:
+    """Get audio duration from parakeet result or calculate from file."""
+    # Try to get duration from parakeet result first
+    if hasattr(result, "duration") and result.duration is not None:
+        return result.duration
+
+    # If parakeet result has sentences, calculate from last sentence end time
+    if hasattr(result, "sentences") and result.sentences:
+        return max(sentence.end for sentence in result.sentences)
+
+    # Fallback to calculating from audio file
+    return _calculate_audio_duration(audio_path)
 
 
 @router.get("/debug/cfg")
