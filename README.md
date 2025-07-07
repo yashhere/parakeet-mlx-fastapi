@@ -178,6 +178,36 @@ uv run ruff format .
 uv run ruff check --fix .
 ```
 
+### Creating a New Release
+
+This project uses automated releases triggered by Git tags. The version is automatically derived from the tag using dynamic versioning.
+
+```bash
+# 1. Ensure your changes are committed and pushed to main
+git add .
+git commit -m "Your changes"
+git push origin main
+
+# 2. Create and push a version tag (this triggers the release workflow)
+git tag v1.2.3  # Use semantic versioning (v1.2.3, v2.0.0, etc.)
+git push origin v1.2.3
+
+# The GitHub workflow will automatically:
+# - Build the package with version 1.2.3
+# - Create a GitHub release
+# - Upload wheel and source distributions
+# - Generate release notes with installation instructions
+```
+
+**Pre-release versions:**
+
+```bash
+# For beta/alpha releases
+git tag v1.2.3-beta
+git push origin v1.2.3-beta
+# Creates: parakeet_mlx_fastapi-1.2.3b0-py3-none-any.whl
+```
+
 ## API Usage
 
 Once the service is running, it will be available at `http://localhost:8765`.
